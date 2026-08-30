@@ -43,7 +43,7 @@ docs/archive/<大需求名>-大需求/
 ## 归档前置检查（3 条，缺一不可）
 
 1. ✅ **ADR 在位**：本需求全部 ADR 已落在 `docs/decisions/`（决策日记永不进 archive）
-2. ✅ **未决决策不丢**：ROADMAP 决策菜单里主人未勾选的项已抄录进 `docs/backlog.md`
+2. ✅ **未决决策不丢**：ROADMAP 决策菜单里项目所有者未勾选的项已抄录进 `docs/backlog.md`
 3. ✅ **waiver 清零**：`docs/gate-waivers.md` 已清空（或剩余项已登记 backlog 并注明原因），文件随需求归档
 
 ## 什么绝不该进 archive（真正常驻的只有 4 类）

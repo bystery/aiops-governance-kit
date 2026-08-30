@@ -18,7 +18,7 @@ rend "$SRC/.aiops/读集.md.template"              "$DEST/.aiops/读集.md"
 cp  "$SRC/.aiops/docs/decisions/ADR-模板.md.template" "$DEST/.aiops/docs/decisions/ADR-模板.md"
 cp  "$SRC/.aiops/docs/archive/归档说明.md.template"   "$DEST/.aiops/docs/archive/"
 for f in "$SRC"/.aiops/docs/archive/归档件模板/*.template; do cp "$f" "$DEST/.aiops/docs/archive/归档件模板/"; done
-rend "$SRC/.aiops/主人面板.md.template"          "$DEST/.aiops/主人面板.md"
+rend "$SRC/.aiops/所有者面板.md.template"          "$DEST/.aiops/所有者面板.md"
 rend "$SRC/.aiops/agents/宿主映射表.md.template" "$DEST/.aiops/agents/宿主映射表.md"
 cp "$SRC"/.aiops/scripts/hooks/* "$DEST/.aiops/scripts/hooks/"
 rend "$SRC/AGENTS.md.template" "$DEST/AGENTS.md"

@@ -8,4 +8,4 @@
 | checker | .aiops/agents/checker.md | .qoder/agents/checker.md（Qoder） | 复制条文段 |
 | 调研者 | .aiops/agents/researcher.md | .qoder/agents/researcher.md（Qoder） | 复制条文段 |
 
-落盘布局：.aiops/docs = 过程文档 · .aiops/scripts/hooks = 机械门禁（`git config core.hooksPath .aiops/scripts/hooks`）· .aiops/主人面板.md = 唯一人文件 · .aiops/读集.md = 读集边界。
+落盘布局：.aiops/docs = 过程文档 · .aiops/scripts/hooks = 机械门禁（`git config core.hooksPath .aiops/scripts/hooks`）· .aiops/所有者面板.md = 唯一人文件 · .aiops/读集.md = 读集边界。
