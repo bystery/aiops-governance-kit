@@ -1,0 +1,19 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs & temp
+*.log
+*.tmp
+*.bak
+
+# Dependencies / build artifacts
+node_modules/
+__pycache__/
+dist/
+build/
+
+# Secrets
+.env
+.env.*

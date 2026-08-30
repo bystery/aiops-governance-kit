@@ -1,0 +1,5 @@
+# AGENTS.md — 指针：本仓库 AI 协作规则唯一正本 = .aiops/AGENTS.md，每会话先读它
+进度现场 = .aiops/docs/PROGRESS.md（头部"当前授权模式"行 = 授权唯一载体）。
+框架落盘物一律在 .aiops/（docs / scripts/hooks / agents）；根目录只留本指针 + 业务代码 + 主人指定的人读档案。
+投影正本在 .aiops/agents/，宿主渲染目标见 .aiops/agents/宿主映射表.md。
+禁止向本文件追加规则——加规则改 .aiops/AGENTS.md。

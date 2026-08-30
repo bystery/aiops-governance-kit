@@ -1,0 +1,75 @@
+# docs/archive/ —— 归档区使用说明
+
+> 这里存放"已完成大需求"的**过程文档**。归档 = 封存留档（不是删除），让 `docs/` 根下永远只
+> 看到"常驻的"文档。归档区干干净净，不会因为历史需求堆积而变乱。
+
+## 一句话分档（本套文档的最高原则）
+
+> **凡是一次特定大需求产出/专属的文档 → 做完归档，不常驻。**
+> **真正常驻的只有 4 类：AGENTS.md（宪法+活地图，放项目根）、PROGRESS.md（进度）、
+> backlog.md（想法池）、decisions/（ADR 决策日记）。**
+
+## 什么进 archive
+
+每个**大需求**（走完整 playbook 流程的重构/大改造）做完后，**过完下方"归档前置检查"**，
+把这个大需求**产出的所有过程文档**整个文件夹丢进来：
+
+- `PLAYBOOK.md`（该大需求总控手册）
+- `MIGRATION_PLAN.md`（该大需求分步迁移计划）
+- `ARCHITECTURE.md`（该大需求定稿的架构深度快照；**当前架构看 AGENTS.md 活地图**）
+- `ROADMAP.md`（仅产品类大需求有）
+- `manual-checklist.md`（该大需求人工验收清单）
+- `audits/`（该大需求期间产生的所有审计报告）
+- `research/`（该大需求期间的调研报告——有调研才有，无则不建）
+- `gate-waivers.md`（终验清零后的最终状态）
+
+**命名约定**：`docs/archive/<大需求名>-大需求/`
+
+**例子**：
+```
+docs/archive/<大需求名>-大需求/
+├── AI_REBUILD_PLAYBOOK.md   ← 历史原名，归档不改名
+├── MIGRATION_PLAN.md
+├── ARCHITECTURE.md
+├── ROADMAP.md
+├── manual-checklist.md
+├── research/                ← 有调研才有，无则不建
+└── audits/
+    ├── 00-baseline.md
+    ├── 10-debris.md
+    ...
+```
+
+## 归档前置检查（3 条，缺一不可）
+
+1. ✅ **ADR 在位**：本需求全部 ADR 已落在 `docs/decisions/`（决策日记永不进 archive）
+2. ✅ **未决决策不丢**：ROADMAP 决策菜单里主人未勾选的项已抄录进 `docs/backlog.md`
+3. ✅ **waiver 清零**：`docs/gate-waivers.md` 已清空（或剩余项已登记 backlog 并注明原因），文件随需求归档
+
+## 什么绝不该进 archive（真正常驻的只有 4 类）
+
+| 文档 | 为什么常驻 |
+|---|---|
+| `AGENTS.md` | 项目宪法 + 架构总览**活地图**，放**项目根目录** |
+| `docs/PROGRESS.md` | 唯一动态进度，永远一份，断点续跑依据 |
+| `docs/backlog.md` | 想法池/待办/未决产品决策，永远一份 |
+| `docs/decisions/`（ADR） | **项目永久决策日记**，编号递增、只增不改、永不归档 |
+
+> 除此之外的文档（PLAYBOOK / MIGRATION_PLAN / ARCHITECTURE / ROADMAP / manual-checklist /
+> audits / gate-waivers 等）都属"特定大需求产出"，做完随大需求进 archive。
+
+## 归档纪律
+
+1. 归档不删改：已归档文件保持当时原样（它们是历史现场记录），**历史文件名也不改**。
+   **唯一例外（v3.1）**：允许在归档件头部追加"警示行"（如"本示例产出于 v2 时代，做法以现行规程为准"）
+   ——不改原内容，只为防止后人照旧做法学坏
+2. 大需求一完成就归档，别让过程文档长期堆在 docs/ 根下
+3. 归档前必须过完上方 3 条前置检查
+4. 每次只会有一个"正在做的大需求"；同时有多个大需求时，每个各有独立文件夹
+
+## 归档后找不到内容怎么办
+
+- 常驻文档想引用已归档内容（如 PROGRESS.md 引用某审计报告）时，路径写完整：
+  `docs/archive/<大需求名>-大需求/audits/<报告名>.md`
+- 想知道"当前项目架构" → 看 `AGENTS.md` 架构总览（活地图）
+- 想看"某次大改造的完整细节" → 看对应归档的 `ARCHITECTURE.md`（深度快照）

@@ -1,0 +1,28 @@
+# 读集（常读/按需边界——唯一清单；净效果=常读不涨，新增读什么必须指出删什么）
+## 常读集（每会话必读，前缀稳定区，顺序固定）
+1. 根 AGENTS.md（指针 → .aiops/AGENTS.md）
+2. .aiops/AGENTS.md（宪法）
+3. .aiops/docs/PROGRESS.md（进度现场 + 授权模式行）
+## 按需集（触发才读，插入后顺序不再变动）
+
+### 按需取用表（要产出什么 → 读什么；示例仅当模板字段不明时读一份）
+| 要产出 / 动作 | 模板 | 示例（填好版，仅当模板字段不明时读） |
+|---|---|---|
+| 新项目初始化 | `项目模板/.aiops/AGENTS.md.template`（根 AGENTS=≤5 行指针，init 脚本生成） | 〈例〉`AGENTS.md` |
+| 记进度 | `项目模板/.aiops/docs/PROGRESS.md.template` | 〈例〉`docs/PROGRESS.md` |
+| 登记待办 | `项目模板/.aiops/docs/backlog.md.template` | 〈例〉`docs/backlog.md` |
+| 技术决策 ADR | `项目模板/.aiops/docs/decisions/ADR-模板.md.template` | 〈例〉`docs/decisions/ADR-1-<决策名>.md` |
+| 大需求开工 | 〈归〉`PLAYBOOK.md.template` | 〈例〉`docs/archive/<大需求名>-大需求/AI_REBUILD_PLAYBOOK.md` |
+| 分步迁移计划 | 〈归〉`MIGRATION_PLAN.md.template` | 同上目录 `MIGRATION_PLAN.md` |
+| 架构快照 | 〈归〉`ARCHITECTURE.md.template` | 同上目录 `ARCHITECTURE.md` |
+| 产品路线图 | 〈归〉`ROADMAP.md.template` | 同上目录 `ROADMAP.md` |
+| 人工验收清单 | 〈归〉`manual-checklist.md.template` | 同上目录 `manual-checklist.md` |
+| 审计报告 / verdict | 〈归〉`审计报告模板.md.template` | 同上目录 `audits/20-full-audit.md` |
+| 归档收尾 | `项目模板/.aiops/docs/archive/归档说明.md.template` | 规则在归档说明模板内 |
+| 错误模式清单 / 登记教训 | `项目模板/.aiops/docs/错误模式清单.md.template` | — |
+
+- .aiops/docs/错误模式清单.md——触发：派单前（按阶段过滤注入）
+- .aiops/docs/archive/ 归档件模板——触发：要产出对应文档那一刻读模板；示例可取本仓库已归档的历史文档
+- .aiops/docs/decisions/——触发：考古决策依据
+- .aiops/agents/宿主映射表.md——触发：生成投影/派子代理前
+- docs/research/ 调研报告——触发：采信前抽验出处
