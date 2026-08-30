@@ -86,7 +86,7 @@ ui（界面） → viewmodel（状态/调度） → domain（业务规则） →
 17. 一个 commit 一个意图；前缀用 `feat` / `fix` / `refactor` / `style` / `docs`
 18. **禁止用 `git commit --no-verify` 绕过 pre-commit 钩子**——被钩子挡住 = 检查没过，
     先修问题再提交；绕过 = 门禁形同虚设
-19. **大需求执行期间，PASS 后的整批 commit 必须打包（v3.4）**：本批代码 + checker verdict
+19. **大需求执行期间，PASS 后的整批 commit 必须打包**：本批代码 + checker verdict
     （.aiops/docs/audits/）+ PROGRESS 更新 + 本批产出的 ADR——过程文档躺在 git 未跟踪区
     = 防篡改检查空转、ADR 误删即失；提交他人追加的文件是义务，不是越权
 20. **克隆后一次性执行 `git config core.hooksPath .aiops/scripts/hooks` 激活机械门禁三钩子**；

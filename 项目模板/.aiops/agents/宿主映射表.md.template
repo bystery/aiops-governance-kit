@@ -1,11 +1,11 @@
 # 宿主映射表（投影正本永在 .aiops/agents/；宿主侧只是渲染结果，加宿主 = 加一行）
 > 正本列在主控首次生成投影前为占位；渲染方式 = 复制条文段，frontmatter（model/tools）归宿主保留。
 
-| 角色 | 正本 | 宿主渲染目标 | 渲染方式 | 版本 |
-|---|---|---|---|---|
-| planner | .aiops/agents/planner.md | .qoder/agents/planner.md（Qoder） | 复制条文段 | v4.4 |
-| worker | .aiops/agents/worker.md | .qoder/agents/worker.md（Qoder） | 复制条文段 | v4.4 |
-| checker | .aiops/agents/checker.md | .qoder/agents/checker.md（Qoder） | 复制条文段 | v4.4 |
-| 调研者 | .aiops/agents/researcher.md | .qoder/agents/researcher.md（Qoder） | 复制条文段 | v4.4 |
+| 角色 | 正本 | 宿主渲染目标 | 渲染方式 |
+|---|---|---|---|
+| planner | .aiops/agents/planner.md | .qoder/agents/planner.md（Qoder） | 复制条文段 |
+| worker | .aiops/agents/worker.md | .qoder/agents/worker.md（Qoder） | 复制条文段 |
+| checker | .aiops/agents/checker.md | .qoder/agents/checker.md（Qoder） | 复制条文段 |
+| 调研者 | .aiops/agents/researcher.md | .qoder/agents/researcher.md（Qoder） | 复制条文段 |
 
 落盘布局：.aiops/docs = 过程文档 · .aiops/scripts/hooks = 机械门禁（`git config core.hooksPath .aiops/scripts/hooks`）· .aiops/主人面板.md = 唯一人文件 · .aiops/读集.md = 读集边界。

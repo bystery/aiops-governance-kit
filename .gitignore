@@ -1,7 +1,18 @@
-# OS / editor
+# OS
 .DS_Store
 Thumbs.db
 desktop.ini
+$RECYCLE.BIN/
+
+# Office lock files（Word/Excel 打开时的 ~$ 临时锁）
+~$*
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.orig
 
 # Logs & temp
 *.log
