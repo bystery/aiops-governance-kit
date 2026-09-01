@@ -73,9 +73,9 @@ ui（界面） → viewmodel（状态/调度） → domain（业务规则） →
 
 ### 变更纪律
 11. 删除/移动文件前必须全项目搜索引用
-12. 大需求执行期间，每批改动完成后必须：<构建/测试通过> + 过本需求 docs/manual-checklist.md 对应项
+12. 大需求执行期间，每批改动完成后必须：<构建/测试通过> + 过本需求 .aiops/docs/manual-checklist.md 对应项
     （manual-checklist 是随大需求归档的清单；小/中需求不产它，用构建/运行验证把关）
-13. 改动后同步更新 docs/；**动模块结构必须同步 AGENTS.md 架构总览**
+13. 改动后同步更新 .aiops/docs/；**动模块结构必须同步 AGENTS.md 架构总览**
 14. 顺手优化一律禁止——记入 .aiops/docs/backlog.md
 15. **新增第三方依赖必须落 ADR**（写用途、备选方案、许可证、官方来源链接），
     禁止为省一点事引入大框架——新增依赖 = 大需求（分级判据④，走大需求流程）
@@ -95,14 +95,14 @@ ui（界面） → viewmodel（状态/调度） → domain（业务规则） →
 ---
 
 **过渡条款（存量违例处理）**：<如果有历史遗留违例写这里登记（文件+原因+治理计划），
-大需求期间同步录入 docs/gate-waivers.md 走豁免；没有就删掉本节。>
+大需求期间同步录入 .aiops/docs/gate-waivers.md 走豁免；没有就删掉本节。>
 
 ## 新功能接入流程
 
 1. 先列预计要动的文件清单，按大/中/小分级（判据见方法论第三章；拿不准就高不就低）；
    探索性/说不清验收标准的需求 → 走**原型通道**（红线全域生效 / 物理隔离（playground/ 整目录
    gitignore 或独立仓库）/ 转正必过 checker 体检，三条硬边界见方法论第三章）
-2. 大需求：由 planner 先在 docs/ 写 PLAYBOOK（机械检查清单与判定标准开工前固化，checker 照单独立复核，
+2. 大需求：由 planner 先在 .aiops/docs/ 写 PLAYBOOK（机械检查清单与判定标准开工前固化，checker 照单独立复核，
    角色定义见方法论《智能体角色定义.md》）；中/小需求直接进入下一步
 3. 有技术取舍 → .aiops/docs/decisions/ 写一页设计登记（做什么/动哪些层/验证标准）
 4. 实现代码（遵守分层）
@@ -125,6 +125,6 @@ ui（界面） → viewmodel（状态/调度） → domain（业务规则） →
 
 归档（大需求做完封存，历史现场）：
 - .aiops/docs/archive/<大需求名>-大需求/ — PLAYBOOK / MIGRATION_PLAN / ARCHITECTURE（深度快照）/
-  ROADMAP（仅产品类需求）/ manual-checklist.md / audits/ / research/（调研报告，执行期在 docs/research/）/
+  ROADMAP（仅产品类需求）/ manual-checklist.md / audits/ / research/（调研报告，执行期在 .aiops/docs/research/）/
   gate-waivers.md（清零后）
 - 当前架构看本文件活地图；某次大改造的完整细节看对应归档的 ARCHITECTURE.md

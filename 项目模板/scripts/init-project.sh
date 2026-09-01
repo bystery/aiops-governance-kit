@@ -1,6 +1,6 @@
 #!/bin/sh
 # init-project.sh <目标目录> <项目名> —— 盖章式生成新项目 .aiops/ 骨架（不交互、不覆盖）
-# 行为测试：init-project.sh /tmp/test-project 测试项目 → 产物 ≥24 项逐项存在 → 退出 0；同目录重跑 → 退出 2
+# 行为测试：init-project.sh /tmp/test-project 测试项目 → 产物逐项存在 → 退出 0；同目录重跑 → 退出 2
 set -u
 [ $# -eq 2 ] || { echo "用法: init-project.sh <目标目录> <项目名>"; exit 2; }
 DEST=$1; NAME=$2

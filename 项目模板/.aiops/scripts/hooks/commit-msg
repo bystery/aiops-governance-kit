@@ -1,6 +1,6 @@
 #!/bin/sh
 # 钩子2（commit-msg）：PROGRESS 行数缩水拒绝
-# 拦截：暂存区 docs/PROGRESS.md 行数比 HEAD 小（净删行）且提交信息无 [PROGRESS压缩] 标记
+# 拦截：暂存区 .aiops/docs/PROGRESS.md 行数比 HEAD 小（净删行）且提交信息无 [PROGRESS压缩] 标记
 # 背景：防 PROGRESS 行数缩水未标记
 # 能力边界：只防净删行（行数变小）；同量换内容的防篡改靠 checker 终验的 git log -p 保留检查。
 # 说明：挂在 commit-msg 位而非 pre-commit——pre-commit 阶段读不到提交信息，
@@ -13,27 +13,27 @@ msgfile="$1"
 
 head_ok=0
 stage_ok=0
-git cat-file -e HEAD:docs/PROGRESS.md 2>/dev/null && head_ok=1
-git cat-file -e ":docs/PROGRESS.md" 2>/dev/null && stage_ok=1
+git cat-file -e HEAD:.aiops/docs/PROGRESS.md 2>/dev/null && head_ok=1
+git cat-file -e ":.aiops/docs/PROGRESS.md" 2>/dev/null && stage_ok=1
 
 # HEAD 没有 PROGRESS（首次提交）→ 无缩水可比
 [ "$head_ok" -eq 1 ] || exit 0
 
 # HEAD 有、暂存区没有（整个文件被删）→ 也算净删
 if [ "$stage_ok" -ne 1 ]; then
-    echo "[commit-msg] 拦下：docs/PROGRESS.md 在本次提交中被整体删除（净删行）。" >&2
+    echo "[commit-msg] 拦下：.aiops/docs/PROGRESS.md 在本次提交中被整体删除（净删行）。" >&2
     echo "             合法压缩收尾：提交信息带 [PROGRESS压缩] 标记，并在 PROGRESS 登记一行。" >&2
     exit 1
 fi
 
-head_lines=$(git show HEAD:docs/PROGRESS.md 2>/dev/null | wc -l | tr -d ' ')
-stage_lines=$(git show ":docs/PROGRESS.md" 2>/dev/null | wc -l | tr -d ' ')
+head_lines=$(git show HEAD:.aiops/docs/PROGRESS.md 2>/dev/null | wc -l | tr -d ' ')
+stage_lines=$(git show ":.aiops/docs/PROGRESS.md" 2>/dev/null | wc -l | tr -d ' ')
 
 if [ "$stage_lines" -lt "$head_lines" ]; then
     if grep -qF '[PROGRESS压缩]' "$msgfile"; then
         exit 0
     fi
-    echo "[commit-msg] 拦下：docs/PROGRESS.md 行数缩水（HEAD $head_lines 行 → 本次 $stage_lines 行，净删行）。" >&2
+    echo "[commit-msg] 拦下：.aiops/docs/PROGRESS.md 行数缩水（HEAD $head_lines 行 → 本次 $stage_lines 行，净删行）。" >&2
     echo "             合法压缩收尾：提交信息带 [PROGRESS压缩] 标记，并在 PROGRESS 登记一行。" >&2
     exit 1
 fi

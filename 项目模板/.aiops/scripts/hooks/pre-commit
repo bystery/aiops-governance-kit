@@ -1,13 +1,14 @@
 #!/bin/sh
 # 钩子1（pre-commit）：checker 结论行 verdict 存在性校验
-# 拦截：docs/PROGRESS.md 新增 checker 结论行引用的 verdict 文件
+# 拦截：.aiops/docs/PROGRESS.md 新增 checker 结论行引用的 verdict 文件
 #       不存在 / 未 git add / 内容不含与结论行相同的 PASS-FAIL 子串
 # 背景：防 verdict 漏交/缺失
 # 能力边界：只防"忘写/漏交"，不防"伪造"——伪造的防线 = checker 只认磁盘 + 异源。
 
 set -u
 
-added=$(git diff --cached -- docs/PROGRESS.md 2>/dev/null | tr -d '\r' | grep '^+' | grep '|[[:space:]]*\(PASS\|FAIL\)[[:space:]]*|' | grep 'docs/audits/check-')
+added=$(git diff --cached -- .aiops/docs/PROGRESS.md 2>/dev/null | tr -d '\r' | grep '^+' | grep '|[[:space:]]*\(PASS\|FAIL\)[[:space:]]*|' | grep '.aiops/docs/audits/check-' | grep -v '示例行')
+# （示例行）排除项：PROGRESS 模板自带的示例结论行不参与校验——否则新项目首次 commit 即被示例卡死
 
 # 暂存区没有新增 checker 结论行 → 无事可查
 [ -n "$added" ] || exit 0
@@ -18,11 +19,11 @@ printf '%s\n' "$added" > "$list"
 err=0
 while IFS= read -r line; do
     word=$(printf '%s\n' "$line" | grep -o '\(PASS\|FAIL\)' | head -n 1)
-    path=$(printf '%s\n' "$line" | grep -o 'docs/audits/check-[A-Za-z0-9._/-]*' | head -n 1)
+    path=$(printf '%s\n' "$line" | grep -o '.aiops/docs/audits/check-[A-Za-z0-9._/-]*' | head -n 1)
 
     if [ -z "$path" ]; then
         echo "[pre-commit] 拦下：PROGRESS 新增结论行提取不到 verdict 路径：$line" >&2
-        echo "            先补写 verdict（docs/audits/check-*.md）并 git add，再提交。" >&2
+        echo "            先补写 verdict（.aiops/docs/audits/check-*.md）并 git add，再提交。" >&2
         err=1
         continue
     fi

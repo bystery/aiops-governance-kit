@@ -43,5 +43,5 @@
 
 ## 存档约定
 - 审计报告命名：`<序号>-<类型>.md`（如 `00-baseline.md`、`10-debris.md`、`30-final-report.md`）
-- 存到 `docs/audits/`
+- 存到 `.aiops/docs/audits/`
 - 纪律：结论必须有证据（引用搜索命中数、文件存在性验证）；拿不准放"疑似"并给验证方法；不改任何文件
