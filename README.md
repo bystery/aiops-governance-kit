@@ -77,9 +77,9 @@ AI 写代码，快，但不可信。用下来翻车基本逃不出这三种：
       → 记录教训 → 修正 → 再执行
 
  机械门禁（git hooks，可选但强烈建议）：
-   pre-commit  = PROGRESS 验收结论行必配真实 verdict
+   pre-commit  = PROGRESS 验收结论行必配真实台账节 + 文件预算（直属数/白名单/临时件/台账前缀/行数）
    commit-msg  = 进度文件净删行必须带压缩标记
-   手动检查 ×3 = 锚点唯一性 / 会话批次数上限 / 常读文档字节上限
+   手动检查 ×4 = 锚点唯一性 / 会话批次数上限 / 常读文档字节上限 / 拷问技能在位
 ```
 
 ## Quick Start（从复制到跑通，5 分钟量级）
@@ -89,8 +89,9 @@ AI 写代码，快，但不可信。用下来翻车基本逃不出这三种：
 git clone https://github.com/<你的账号>/aiops-governance-kit.git
 # 2. 一条命令生成新项目的治理骨架（不交互、不覆盖已有内容）
 aiops-governance-kit/项目模板/scripts/init-project.sh ~/my-project 我的项目
-# 3. 激活机械门禁
+# 3. 激活机械门禁 + 安装拷问技能（来源写死：mattpocock/skills，联网）
 cd ~/my-project && git config core.hooksPath .aiops/scripts/hooks
+sh .aiops/scripts/hooks/install-grill-skill.sh
 # 4. 新开一个 AI 会话：把 主控卡.md 全文作为第一条消息发出，
 #    并附一行「当前授权模式：默认」
 # 5. 用一句话提第一个需求，例如："给 README 补一个安装小节"
@@ -130,6 +131,9 @@ cd ~/my-project && git config core.hooksPath .aiops/scripts/hooks
 | 投影（projection） | 从角色定义机械摘录生成、单一角色可见的 prompt 文件 |
 | 门禁 | git hook 机械检查，红就是红，禁止绕过 |
 | PLAYBOOK / PROGRESS | 大需求总控手册 / 项目唯一进度现场文件 |
+| grill-me / grilling | 从 mattpocock/skills 下载的拷问技能 / 其方法论本体（决策树分轮追问） |
+| 审计台账（ledger） | 每个大需求一份的验收结论文件，每批追加一节，代替每批一个 verdict 文件 |
+| 需求登记子集 | 调研者对齐特例的唯一产出文件，主控合并进 PROGRESS 后即删、不长期驻留 HEAD |
 
 ## FAQ
 

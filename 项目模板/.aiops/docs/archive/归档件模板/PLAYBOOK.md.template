@@ -41,7 +41,7 @@ GOAL 与验收标准必须能回指到登记账本③栏终态。
 **硬性约束：**
 1. 全程禁止推倒重写；任何时刻项目必须保持可<构建/运行>、核心功能可用
 2. **执行与审查：** 每批改动后，由与 worker 不同源的 checker **独立重跑**附录 M 的
-   checker 验收项，原始输出存进 checker 自己的 verdict 文件（.aiops/docs/audits/check-*.md）——
+   checker 验收项，原始输出存进 verdict 台账（.aiops/docs/audits/ledger-<大需求名>.md 当批节）——
    worker 不得代跑代贴，checker 不采信 worker 粘贴的历史输出（只作线索，不作证据）。
    门禁全部绿色=PASS；任何红色项=FAIL，必须修复后重跑该步全门检查。命中项属于
    <.aiops/docs/gate-waivers.md> 已登记存量违例的，引用 waiver 编号豁免。**禁止跳过门禁、
@@ -217,7 +217,8 @@ AGENTS.md 开工时就已存在——本阶段**更新**它：架构总览（活
 5. **汇报**：worker 按简明技术简报（结论+证据+下一步）向主控报告本批。**转交 checker 的
    信息只允许文件路径 + 客观事实，禁止夹带评价**
 6. **复核**：checker 独立重跑本批 checker 验收项（附录 M 对应项全量）+ 按判定标准判读，
-   出**一份批量 verdict**（每步一个子节：结论+证据+行号），落 `.aiops/docs/audits/check-<批次>-<日期>.md`。
+   在 verdict 台账（`.aiops/docs/audits/ledger-<大需求名>.md`）**追加当批一节**
+   （标题 `## B<N> <日期>`，每步一个子小节：结论+证据+行号）。
    任何红色/不通过 → 回给 worker 修复（≤2 轮，仍 FAIL 按主控卡第五节阶梯处置）。
    checker 验终局不验过程（逐条对最终状态清单）——步骤有误但终态全对 = 放行（偏差记
    backlog）；步骤全对但终态不对 = 打回。
@@ -301,7 +302,7 @@ C. ...
 - 手动验证清单统一累积在 .aiops/docs/manual-checklist.md（随本需求归档）；自动做出的决策全在
   ADR 里，用户事后可推翻；commit 自动执行，git log 可回看全程、任何时刻可回退；
   进度唯一依据是进度文档
-- checker 的 verdict（.aiops/docs/audits/check-*.md）是验收唯一依据；项目所有者可让任何新会话重跑
+- checker 的 verdict 台账（.aiops/docs/audits/ledger-*.md）是验收唯一依据；项目所有者可让任何新会话重跑
   附录 M 同一清单核对与 verdict 存档一致（项目所有者的"他律"复核手段）
 
 ---

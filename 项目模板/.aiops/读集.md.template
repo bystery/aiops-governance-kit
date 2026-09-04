@@ -20,9 +20,11 @@
 | 审计报告 / verdict | 〈归〉`审计报告模板.md.template` | 同上目录 `audits/20-full-audit.md` |
 | 归档收尾 | `项目模板/.aiops/docs/archive/归档说明.md.template` | 规则在归档说明模板内 |
 | 错误模式清单 / 登记教训 | `项目模板/.aiops/docs/错误模式清单.md.template` | — |
+| 需求对齐拷问（grilling） | .aiops/skills/grilling（来源写死：install-grill-skill.sh 下载 mattpocock/skills 钉死 commit） | — |
 
 - .aiops/docs/错误模式清单.md——触发：派单前（按阶段过滤注入）
 - .aiops/docs/archive/ 归档件模板——触发：要产出对应文档那一刻读模板；示例可取本仓库已归档的历史文档
 - .aiops/docs/decisions/——触发：考古决策依据
 - .aiops/agents/宿主映射表.md——触发：生成投影/派子代理前
-- .aiops/docs/research/ 调研报告——触发：采信前抽验出处
+- .aiops/docs/research/ 调研报告——触发：采信前抽验出处；执行期在手 ≤3，终验清零
+- .aiops/skills/ grilling 技能——触发：需求对齐拷问前，check-grill-skill.sh 绿才开工

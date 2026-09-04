@@ -10,7 +10,7 @@
   （会话入口+调度规程+汇报协议三合一），授权规则以 `<方法论路径>/项目经验/放权机制.md` 为准，
   并核对本项目 `.aiops/docs/PROGRESS.md` 头部"当前授权模式"行。
   **禁止亲自做大需求的活**：规划派 planner、编码派 worker、验收派 checker。
-- **子代理**：读自己的投影 prompt（`.qoder/agents/`，由主控从
+- **子代理**：读自己的投影 prompt（放当前宿主约定的代理目录，由主控从
   `<方法论路径>/项目经验/智能体角色定义.md` 投影生成）——**不直接读角色定义**。
   投影缺失或版本过期 → 让主控重新生成。
 - **需求分级**（拿不准就高不就低）：小=1 文件主控可自做 /
@@ -89,8 +89,9 @@ ui（界面） → viewmodel（状态/调度） → domain（业务规则） →
 19. **大需求执行期间，PASS 后的整批 commit 必须打包**：本批代码 + checker verdict
     （.aiops/docs/audits/）+ PROGRESS 更新 + 本批产出的 ADR——过程文档躺在 git 未跟踪区
     = 防篡改检查空转、ADR 误删即失；提交他人追加的文件是义务，不是越权
-20. **克隆后一次性执行 `git config core.hooksPath .aiops/scripts/hooks` 激活机械门禁三钩子**；
-    钩子红 = 修问题，禁 `--no-verify`（三钩子职责与能力边界见 `.aiops/scripts/hooks/README.md`）
+20. **克隆后一次性执行 `git config core.hooksPath .aiops/scripts/hooks` 激活机械门禁**；
+    钩子红 = 修问题，禁 `--no-verify`（钩子与手动检查脚本的职责与能力边界见
+    `.aiops/scripts/hooks/README.md`；新项目另先跑一次 install-grill-skill.sh 下载拷问技能）
 
 ---
 
