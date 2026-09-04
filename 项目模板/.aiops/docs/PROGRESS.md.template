@@ -54,7 +54,7 @@
 <行式：`批号 | 阶段(done/failed/pending) | verdict 引用 | 待commit(y/n) | 备注`，字段用 ` | `
 分隔，钩子按此解析；新格式行仍以 `- ` 开头（钩子3 的 `grep -c '^-'` 计数判据不变）。示例：>
 
-- B3 | done | .aiops/docs/audits/check-B3-0822.md | y | 备注
+- B3 | done | .aiops/docs/audits/ledger-日常.md | y | 备注
 
 ## 未决事项
 
