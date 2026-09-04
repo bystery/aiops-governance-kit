@@ -1,52 +1,75 @@
 #!/bin/sh
-# 钩子1（pre-commit）：checker 结论行 verdict 存在性校验
-# 拦截：.aiops/docs/PROGRESS.md 新增 checker 结论行引用的 verdict 文件
-#       不存在 / 未 git add / 内容不含与结论行相同的 PASS-FAIL 子串
-# 背景：防 verdict 漏交/缺失
+# 钩子1（pre-commit）：A) checker 结论行 verdict 台账校验  B) 文件预算门禁（内置执行）
+# 拦截：PROGRESS 新增结论行引用的台账不存在 / 未 git add / 不含该批号节（## B<n>）/
+#       内容不含与结论行相同的 PASS-FAIL 子串；文件预算超限（见 check-files-budget.sh）
 # 能力边界：只防"忘写/漏交"，不防"伪造"——伪造的防线 = checker 只认磁盘 + 异源。
-
+# 中文路径须知：git 默认 core.quotepath=true 把中文名转义成八进制引号串——所有判据 -c quotepath=false。
 set -u
-
-added=$(git diff --cached -- .aiops/docs/PROGRESS.md 2>/dev/null | tr -d '\r' | grep '^+' | grep '|[[:space:]]*\(PASS\|FAIL\)[[:space:]]*|' | grep '.aiops/docs/audits/check-' | grep -v '示例行')
-# （示例行）排除项：PROGRESS 模板自带的示例结论行不参与校验——否则新项目首次 commit 即被示例卡死
-
-# 暂存区没有新增 checker 结论行 → 无事可查
-[ -n "$added" ] || exit 0
-
-list=$(mktemp)
-printf '%s\n' "$added" > "$list"
-
 err=0
-while IFS= read -r line; do
-    word=$(printf '%s\n' "$line" | grep -o '\(PASS\|FAIL\)' | head -n 1)
-    path=$(printf '%s\n' "$line" | grep -o '.aiops/docs/audits/check-[A-Za-z0-9._/-]*' | head -n 1)
 
-    if [ -z "$path" ]; then
-        echo "[pre-commit] 拦下：PROGRESS 新增结论行提取不到 verdict 路径：$line" >&2
-        echo "            先补写 verdict（.aiops/docs/audits/check-*.md）并 git add，再提交。" >&2
-        err=1
-        continue
-    fi
-    if [ ! -f "$path" ]; then
-        echo "[pre-commit] 拦下：PROGRESS 结论行引用的 verdict 文件不存在：$path" >&2
-        echo "            （结论行：$line）先补写该 verdict 文件再提交。" >&2
-        err=1
-        continue
-    fi
-    if [ -z "$(git ls-files --cached -- "$path")" ]; then
-        echo "[pre-commit] 拦下：verdict 文件存在但没有 git add：$path" >&2
-        echo "            verdict 必须与 PROGRESS 结论行进同一个 commit。" >&2
-        err=1
-        continue
-    fi
-    if [ -z "$word" ] || ! grep -q "$word" "$path"; then
-        echo "[pre-commit] 拦下：verdict 文件内容不含与结论行相同的 $word 子串：$path" >&2
-        echo "            核对 verdict 结论与 PROGRESS 登记一致后重试。" >&2
-        err=1
-        continue
-    fi
-done < "$list"
-rm -f "$list"
+# 台账文件须是 ledger-*（预算脚本 E 项拦新增非台账；这里兜底一次）
+added=$(git -c core.quotepath=false diff --cached --name-only --diff-filter=A 2>/dev/null | tr -d '\r')
+bad_audit=$(printf '%s\n' "$added" | grep '\.aiops/docs/audits/[^/]*\.md$' | grep -v '/ledger-' || true)
+if [ -n "$bad_audit" ]; then
+    echo "[pre-commit] 拦下：audits/ 新增非台账文件（台账制：每大需求一份 ledger-*）：$(printf '%s\n' "$bad_audit" | tr '\n' ' ')" >&2
+    err=1
+fi
+
+# A 部分：PROGRESS 新增 checker 结论行 → 台账存在性 + 批号节 + PASS/FAIL 子串
+prog=$(git -c core.quotepath=false diff --cached -- .aiops/docs/PROGRESS.md 2>/dev/null | tr -d '\r')
+lines=$(printf '%s\n' "$prog" | grep '^+' | grep '|[[:space:]]*\(PASS\|FAIL\)[[:space:]]*|' | grep '\.aiops/docs/audits/' | grep -v '示例行' || true)
+
+# （示例行）排除项：PROGRESS 模板自带的示例结论行不参与校验——否则新项目首次 commit 即被示例卡死
+# 暂存区没有新增 checker 结论行 → A 部分无事可查（B 部分照常）
+if [ -n "$lines" ]; then
+    list=$(mktemp)
+    printf '%s\n' "$lines" > "$list"
+    while IFS= read -r line; do
+        word=$(printf '%s\n' "$line" | grep -o '\(PASS\|FAIL\)' | head -n 1)
+        path=$(printf '%s\n' "$line" | sed -n 's#.*\(\.aiops/docs/audits/[^ |]*\).*#\1#p' | head -n 1)
+        batch=$(printf '%s\n' "$line" | grep -o 'B[0-9][0-9]*' | head -n 1)
+
+        if [ -z "$path" ]; then
+            echo "[pre-commit] 拦下：PROGRESS 新增结论行提取不到台账路径：$line" >&2
+            echo "            先补写台账（.aiops/docs/audits/ledger-*）并 git add，再提交。" >&2
+            err=1
+            continue
+        fi
+        # 台账必须已暂存（与 PROGRESS 结论行同 commit），并真实存在于工作区
+        if [ -z "$(git ls-files --cached -- "$path")" ]; then
+            echo "[pre-commit] 拦下：台账存在但没有 git add：$path" >&2
+            echo "            台账必须与 PROGRESS 结论行进同一个 commit。" >&2
+            err=1
+            continue
+        fi
+        if [ ! -f "$path" ]; then
+            echo "[pre-commit] 拦下：结论行引用已暂存的台账路径，但工作区无此文件：$path" >&2
+            err=1
+            continue
+        fi
+        if [ -z "$word" ] || ! grep -q "$word" "$path"; then
+            echo "[pre-commit] 拦下：台账文件内容不含与结论行相同的 $word 子串：$path" >&2
+            echo "            核对台账结论与 PROGRESS 登记一致后重试。" >&2
+            err=1
+            continue
+        fi
+        # 台账须含该批号节（## B<n>）——旧"每批一文件"制的文件存在性检查在此被节存在性取代
+        case "$path" in
+            *ledger-*)
+                if [ -n "$batch" ] && ! tr -d '\r' < "$path" | grep -q "^## $batch"; then
+                    echo "[pre-commit] 拦下：台账 $path 内找不到该批号的节（## $batch）。" >&2
+                    echo "            checker 须在台账内为该批追加一节后再提交。" >&2
+                    err=1
+                    continue
+                fi
+                ;;
+        esac
+    done < "$list"
+    rm -f "$list"
+fi
+
+# B 部分：文件预算门禁（需求书4/5/6——钩子级执行才算落地）
+sh "$(dirname "$0")/check-files-budget.sh" mode=diff || err=1
 
 [ "$err" -eq 0 ] || exit 1
 exit 0

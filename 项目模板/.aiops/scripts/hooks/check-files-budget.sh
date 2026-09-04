@@ -16,6 +16,9 @@
 # 中文路径判据统一 -c core.quotepath=false（git 默认八进制转义会把中文名变成引号串，漏检）
 set -u
 mode=${1:-diff}
+# 兼容两种传参：mode=diff / mode=all（指导书调用约定）与裸 diff / all——
+# 若按字面比对，"mode=diff" != "diff" 会走错分支（实测红：pre-commit 内置调用时 D 判据恒红）
+case "$mode" in mode=*) mode=${mode#mode=} ;; esac
 err=0
 
 GITQ="git -c core.quotepath=false"
