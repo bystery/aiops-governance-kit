@@ -9,18 +9,21 @@
 
 </div>
 
-## 快速启动
+## Quick Start
 
-下载完项目之后，新开一个 AI 会话，直接把 [开启提示词.txt](开启提示词.txt) 里的内容原样发给 AI 就行——就这两行：
-
-```text
-先读两个文件（都在本仓库根目录）：主控卡.md、放权机制.md。
-当前授权模式：默认
+```sh
+# 1. 克隆本仓库
+git clone https://github.com/bystery/aiops-governance-kit.git
+# 2. 一条命令给新项目生成治理骨架（不交互、不覆盖已有内容）
+aiops-governance-kit/项目模板/scripts/init-project.sh ~/my-project 我的项目
+# 3. 打开自动检查 + 下载"需求拷问"方法论（要联网；下载来源固定并校验指纹，
+#    防止装到被篡改的版本。装了它，需求说不清时 AI 会分轮追问你，而不是自己猜）
+cd ~/my-project && git config core.hooksPath .aiops/scripts/hooks
+sh .aiops/scripts/hooks/install-grill-skill.sh
+# 4. 新开一个 AI 会话：把 开启提示词.txt 里的内容原样作为第一条消息发出
+#    （内容就两行：先读主控卡.md、放权机制.md；当前授权模式：默认）
+# 5. 用一句话提第一个需求，例如："给 README 补一个安装小节"
 ```
-
-发完之后，用一句话提你的第一个需求（比如："给 README 补一个安装小节"），剩下的交给框架。
-
-要在新项目里生成治理骨架、开启自动检查的完整步骤，见下文「Quick Start」一节。
 
 ## 为什么要做这个
 
@@ -30,7 +33,7 @@
 
 这些坑大多是我在开发 LoveBrian（一个自己每天都在用的项目）时踩的。每翻一次车，我就停下来把原因查清楚，补一条规则。攒得多了，就长成了现在这套东西：一套给 AI 编码团队用的章程，外加项目模板和几个自动检查。它不靠叮嘱 AI "下次注意"，靠的是分工和制衡——规划、执行、验收、查证四个角色互相把关。整套东西只有 Markdown 和 shell 脚本，零依赖，不绑定平台，任何能读文件、跑 git 的 AI 编码工具都能直接套用。
 
-> **English abstract:** A documentation-only governance framework that lets a team of AI coding agents (planner / worker / independent checker / researcher) deliver reliably with minimal human supervision. This is not a prompt collection: it ports decades of software-engineering governance — separation of duties, audit trails, least privilege, postmortem culture — to AI teams, in the form of three authoritative rulebooks, a project skeleton template, and mechanical git hooks. Chinese is the working language; the [glossary](#术语表) maps every term to English.
+> **English abstract:** A documentation-only governance framework that lets a team of AI coding agents (planner / worker / independent checker / researcher) deliver reliably with minimal human supervision. This is not a prompt collection: it ports decades of software-engineering governance — separation of duties, audit trails, least privilege, postmortem culture — to AI teams, in the form of three authoritative rulebooks, a project skeleton template, and mechanical git hooks. Chinese is the working language; the English column in the document map below gives every term's equivalent.
 
 ## 两个我印象最深的翻车
 
@@ -42,6 +45,8 @@
 ## 这套东西长什么样
 
 一个主控 AI 带四个干活的 AI。主控是唯一和我说话的；四个角色分工固定、互不直连，只通过文件和 git 交流：
+
+![项目治理总览：人、主控、四角色、磁盘通信](docs/overview.jpeg)
 
 ```
                 ┌───────────────────────────────┐
@@ -86,22 +91,6 @@
 4. **规则只许越改越瘦。** 每次修订规则文档，新增的条数不能超过删掉的条数，超了打回重写——文档不许单向变胖。（五条里我最没把握的就是这条：它可能误伤正当的扩写，这条我自己也没完全想清楚。）
 5. **小活不走全流程。** 单文件小修主控亲自做直接提交，中型需求一张任务单，只有大需求才开全流程。流程本身是成本，能省则省。
 
-## Quick Start（从复制到跑通，5 分钟量级）
-
-```sh
-# 1. 克隆本仓库
-git clone https://github.com/bystery/aiops-governance-kit.git
-# 2. 一条命令给新项目生成治理骨架（不交互、不覆盖已有内容）
-aiops-governance-kit/项目模板/scripts/init-project.sh ~/my-project 我的项目
-# 3. 打开自动检查 + 下载"需求拷问"方法论（要联网；下载来源固定并校验指纹，
-#    防止装到被篡改的版本。装了它，需求说不清时 AI 会分轮追问你，而不是自己猜）
-cd ~/my-project && git config core.hooksPath .aiops/scripts/hooks
-sh .aiops/scripts/hooks/install-grill-skill.sh
-# 4. 新开一个 AI 会话：把 开启提示词.txt 里的内容原样作为第一条消息发出
-#    （内容就两行：先读主控卡.md、放权机制.md；当前授权模式：默认）
-# 5. 用一句话提第一个需求，例如："给 README 补一个安装小节"
-```
-
 ## 诚实的边界
 
 - 单文件小改不值得用这套。我自己也不会为改一行字开四个角色。小活不走全流程能缓解开销，消除不了；
@@ -125,25 +114,6 @@ sh .aiops/scripts/hooks/install-grill-skill.sh
 | `grill-me/` `grilling/` | 需求拷问技能（来自 mattpocock/skills，见目录内 README） | Grilling Skills |
 | `开启提示词.txt` | 每次开新会话发给 AI 的开场白 | Session Opener |
 
-## 术语表
-
-正文尽量用白话，行话集中停在这里。
-
-| 术语 | 白话 |
-|---|---|
-| 项目所有者（owner） | 人类所有者，一切工作的委托人与最终拍板人 |
-| 主控（coordinator） | 唯一与项目所有者对话、负责调度其余角色的主 AI |
-| 四角色 | planner（只出计划）/ worker（只执行）/ checker（独立验收）/ researcher（带出处的查证） |
-| 放权（delegation） | 项目所有者把部分把关权授予主控的三档授权：默认 / 基础放权 / 激进放权 |
-| verdict | checker 出具的书面验收结论文件，是 commit 的前置条件 |
-| 补刀 | 主控对小额 FAIL 的直接小修；规则是先落复现手段跑出红，再动手 |
-| 投影（projection） | 从角色定义机械摘录生成、单一角色可见的 prompt 文件 |
-| 门禁 | git hook 机械检查，红就是红，禁止绕过 |
-| PLAYBOOK / PROGRESS | 大需求总控手册 / 项目唯一进度现场文件 |
-| grill-me / grilling | 从 mattpocock/skills 下载的拷问技能 / 其方法论本体（决策树分轮追问） |
-| 审计台账（ledger） | 每个大需求一份的验收结论文件，每批追加一节，代替每批一个 verdict 文件 |
-| 需求登记子集 | researcher 对齐特例的唯一产出文件，主控合并进 PROGRESS 后即删、不长期驻留 HEAD |
-
 ## FAQ
 
 **Q：这和"给 AI 的 prompt 合集"有什么区别？**
@@ -153,7 +123,7 @@ prompt 合集给你台词，这套给你制度：四个角色互相制衡、验�
 任意能读文件、跑 git 的 AI 编码工具（CLI 或 IDE 内置 agent 均可）。检查脚本是纯 POSIX shell + git 原生命令，无第三方依赖。
 
 **Q：文档全是中文，非中文用户能用吗？**
-能。上方术语表与文档地图给全英文对应；条文本身建议用你团队的工作语言维护。
+能。上方文档地图给全英文对应；条文本身建议用你团队的工作语言维护。
 
 **Q：会把小任务搞得很重吗？**
 不会。小活不走全流程就是为此设计的：小修直提、中型一张任务单，只有大需求才进全流程。不过要是连一张任务单都嫌麻烦，那这活多半本来就用不上这套。
