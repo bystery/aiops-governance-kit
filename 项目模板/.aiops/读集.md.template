@@ -8,18 +8,18 @@
 ### 按需取用表（要产出什么 → 读什么；示例仅当模板字段不明时读一份）
 | 要产出 / 动作 | 模板 | 示例（填好版，仅当模板字段不明时读） |
 |---|---|---|
-| 新项目初始化 | `项目模板/.aiops/AGENTS.md.template`（根 AGENTS=≤5 行指针，init 脚本生成） | 〈例〉`AGENTS.md` |
-| 记进度 | `项目模板/.aiops/docs/PROGRESS.md.template` | 〈例〉`.aiops/docs/PROGRESS.md` |
-| 登记待办 | `项目模板/.aiops/docs/backlog.md.template` | 〈例〉`.aiops/docs/backlog.md` |
-| 技术决策 ADR | `项目模板/.aiops/docs/decisions/ADR-模板.md.template` | 〈例〉`.aiops/docs/decisions/ADR-1-<决策名>.md` |
-| 大需求开工 | 〈归〉`PLAYBOOK.md.template` | 〈例〉`.aiops/docs/archive/<大需求名>-大需求/AI_REBUILD_PLAYBOOK.md` |
-| 分步迁移计划 | 〈归〉`MIGRATION_PLAN.md.template` | 同上目录 `MIGRATION_PLAN.md` |
-| 架构快照 | 〈归〉`ARCHITECTURE.md.template` | 同上目录 `ARCHITECTURE.md` |
-| 产品路线图 | 〈归〉`ROADMAP.md.template` | 同上目录 `ROADMAP.md` |
-| 人工验收清单 | 〈归〉`manual-checklist.md.template` | 同上目录 `manual-checklist.md` |
-| 审计报告 / verdict | 〈归〉`审计报告模板.md.template` | 同上目录 `audits/20-full-audit.md` |
-| 归档收尾 | `项目模板/.aiops/docs/archive/归档说明.md.template` | 规则在归档说明模板内 |
-| 错误模式清单 / 登记教训 | `项目模板/.aiops/docs/错误模式清单.md.template` | — |
+| 新项目初始化 | kit 仓侧一次性动作（在框架仓运行 `项目模板/scripts/init-project.sh <目标目录> <项目名>`），本文件生成后此行在目标项目内不再使用 | — |
+| 记进度 | `.aiops/docs/PROGRESS.md`（字段与使用规则见文件尾"使用规则"节） | — |
+| 登记待办 | `.aiops/docs/backlog.md`（字段与使用规则见文件尾"使用规则"节） | — |
+| 技术决策 ADR | `.aiops/docs/decisions/ADR-模板.md`（字段与使用规则见文件尾"使用规则"节） | 〈例〉`.aiops/docs/decisions/ADR-1-<决策名>.md` |
+| 大需求开工 | 〈归〉`.aiops/docs/archive/归档件模板/PLAYBOOK.md.template` | 〈例〉`.aiops/docs/archive/<大需求名>-大需求/AI_REBUILD_PLAYBOOK.md` |
+| 分步迁移计划 | 〈归〉`.aiops/docs/archive/归档件模板/MIGRATION_PLAN.md.template` | 同上目录 `MIGRATION_PLAN.md` |
+| 架构快照 | 〈归〉`.aiops/docs/archive/归档件模板/ARCHITECTURE.md.template` | 同上目录 `ARCHITECTURE.md` |
+| 产品路线图 | 〈归〉`.aiops/docs/archive/归档件模板/ROADMAP.md.template` | 同上目录 `ROADMAP.md` |
+| 人工验收清单 | 〈归〉`.aiops/docs/archive/归档件模板/manual-checklist.md.template` | 同上目录 `manual-checklist.md` |
+| 审计报告 / verdict | 〈归〉`.aiops/docs/archive/归档件模板/审计报告模板.md.template` | 同上目录 `audits/30-final-report.md` |
+| 归档收尾 | `.aiops/docs/archive/归档说明.md`（规则在文件内） | — |
+| 错误模式清单 / 登记教训 | `.aiops/docs/错误模式清单.md`（字段与使用规则见文件内"使用规则"节） | — |
 | 需求对齐拷问（grilling） | .aiops/skills/grilling（来源写死：install-grill-skill.sh 下载 mattpocock/skills 钉死 commit） | — |
 
 - .aiops/docs/错误模式清单.md——触发：派单前（按阶段过滤注入）

@@ -1,23 +1,25 @@
 #!/bin/sh
 # 钩子1（pre-commit）：A) checker 结论行 verdict 台账校验  B) 文件预算门禁（内置执行）
-# 拦截：PROGRESS 新增结论行引用的台账不存在 / 未 git add / 不含该批号节（## B<n>）/
-#       内容不含与结论行相同的 PASS-FAIL 子串；文件预算超限（见 check-files-budget.sh）
+# 拦截：PROGRESS 新增结论行（两要素行 `- B<n> | .aiops/docs/audits/...`，兼容含 |PASS|/|FAIL| 的旧行）
+#       引用的台账不存在 / 未 git add / 不含该批号节（## B<n>）/（行内含 PASS/FAIL 时）内容不含相同子串；
+#       文件预算超限（见 check-files-budget.sh）
 # 能力边界：只防"忘写/漏交"，不防"伪造"——伪造的防线 = checker 只认磁盘 + 异源。
 # 中文路径须知：git 默认 core.quotepath=true 把中文名转义成八进制引号串——所有判据 -c quotepath=false。
 set -u
 err=0
 
-# 台账文件须是 ledger-*（预算脚本 E 项拦新增非台账；这里兜底一次）
+# 台账文件须是 ledger-*（预算脚本 E 项拦新增非台账；这里兜底一次；00-baseline/30-final-report 白名单）
 added=$(git -c core.quotepath=false diff --cached --name-only --diff-filter=A 2>/dev/null | tr -d '\r')
-bad_audit=$(printf '%s\n' "$added" | grep '\.aiops/docs/audits/[^/]*\.md$' | grep -v '/ledger-' || true)
+bad_audit=$(printf '%s\n' "$added" | grep '\.aiops/docs/audits/[^/]*\.md$' | grep -v '/ledger-' | grep -vE '/(00-baseline|30-final-report)\.md$' || true)
 if [ -n "$bad_audit" ]; then
     echo "[pre-commit] 拦下：audits/ 新增非台账文件（台账制：每大需求一份 ledger-*）：$(printf '%s\n' "$bad_audit" | tr '\n' ' ')" >&2
     err=1
 fi
 
 # A 部分：PROGRESS 新增 checker 结论行 → 台账存在性 + 批号节 + PASS/FAIL 子串
+# 结论行两格式：两要素行 `- B<n> | .aiops/docs/audits/...`（现行格式）；含 |PASS|/|FAIL| 的旧行（兼容）
 prog=$(git -c core.quotepath=false diff --cached -- .aiops/docs/PROGRESS.md 2>/dev/null | tr -d '\r')
-lines=$(printf '%s\n' "$prog" | grep '^+' | grep '|[[:space:]]*\(PASS\|FAIL\)[[:space:]]*|' | grep '\.aiops/docs/audits/' | grep -v '示例行' || true)
+lines=$(printf '%s\n' "$prog" | grep '^+' | grep '\.aiops/docs/audits/' | grep -v '示例行' | grep -E '^\+-[[:space:]]*B[0-9]+[[:space:]]*\|[[:space:]]*\.aiops/docs/audits/|\|[[:space:]]*(PASS|FAIL)[[:space:]]*\|' || true)
 
 # （示例行）排除项：PROGRESS 模板自带的示例结论行不参与校验——否则新项目首次 commit 即被示例卡死
 # 暂存区没有新增 checker 结论行 → A 部分无事可查（B 部分照常）
@@ -47,7 +49,8 @@ if [ -n "$lines" ]; then
             err=1
             continue
         fi
-        if [ -z "$word" ] || ! grep -q "$word" "$path"; then
+        # 台账须含该批号节（## B<n>）；行内含 PASS/FAIL 时另行核对子串一致（两要素行无 PASS/FAIL，跳过此查）
+        if [ -n "$word" ] && ! grep -q "$word" "$path"; then
             echo "[pre-commit] 拦下：台账文件内容不含与结论行相同的 $word 子串：$path" >&2
             echo "            核对台账结论与 PROGRESS 登记一致后重试。" >&2
             err=1

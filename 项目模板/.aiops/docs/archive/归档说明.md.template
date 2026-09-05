@@ -35,8 +35,9 @@
 ├── manual-checklist.md
 ├── research/                ← 有调研才有，无则不建
 └── audits/
+    ├── ledger-<大需求名>.md
     ├── 00-baseline.md
-    ├── 10-debris.md
+    ├── 30-final-report.md
     ...
 ```
 

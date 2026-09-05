@@ -10,7 +10,8 @@
 #   D. 临时件判据：.aiops/docs/需求登记子集.md 在 HEAD 却未随本次提交删除 = 红
 #      （先入库留证、在 HEAD 期间所有提交被拦、随下一 commit 删除——拍板6；读 HEAD 不读索引：
 #       入库 commit 时文件已在索引，索引口径会把"留证入库"本身误判红）
-#   E. audits/ 新增 .md 必须带 ledger- 前缀（台账制；mode=diff 只查本次新增 = 老项目存量 check-* 豁免）
+#   E. audits/ 新增 .md 必须带 ledger- 前缀（台账制；00-baseline/30-final-report 两固定名白名单；
+#      mode=diff 只查本次新增 = 老项目存量 check-* 豁免）
 #   F. research 报告（research_*.md）在手 ≤ 3（执行期并行上限），大需求终验清零靠批次6 终验清单
 #   G. PROGRESS.md > 200 行 = 硬红（120 行黄牌之外的真红线）
 # 中文路径判据统一 -c core.quotepath=false（git 默认八进制转义会把中文名变成引号串，漏检）
@@ -80,8 +81,8 @@ if $GITQ rev-parse --git-dir >/dev/null 2>&1; then
         err=1
     fi
 
-    # E. audits/ 下 .md 必须 ledger- 前缀（台账制）
-    bad_audit=$(printf '%s\n' "$added" | grep '\.aiops/docs/audits/[^/]*\.md$' | grep -v '/ledger-' || true)
+    # E. audits/ 下 .md 必须 ledger- 前缀（台账制；00-baseline/30-final-report 白名单）
+    bad_audit=$(printf '%s\n' "$added" | grep '\.aiops/docs/audits/[^/]*\.md$' | grep -v '/ledger-' | grep -vE '/(00-baseline|30-final-report)\.md$' || true)
     if [ -n "$bad_audit" ]; then
         echo "[files-budget] 红：audits/ 新增非台账文件（只许 ledger-* 一份/大需求）：$(printf '%s\n' "$bad_audit" | tr '\n' ' ')" >&2
         err=1
