@@ -75,7 +75,7 @@
 
 ```sh
 # 1. 克隆本仓库
-git clone https://github.com/<你的账号>/aiops-governance-kit.git
+git clone https://github.com/bystery/aiops-governance-kit.git
 # 2. 一条命令给新项目生成治理骨架（不交互、不覆盖已有内容）
 aiops-governance-kit/项目模板/scripts/init-project.sh ~/my-project 我的项目
 # 3. 打开自动检查 + 下载"需求拷问"方法论（要联网；下载来源固定并校验指纹，
@@ -107,6 +107,8 @@ sh .aiops/scripts/hooks/install-grill-skill.sh
 | `项目模板/.aiops/` | 治理文档骨架（进度/待办/决策/读集等模板） | Governance Skeleton Templates |
 | `项目模板/.aiops/scripts/hooks/` | 自动检查脚本（git hooks） | Mechanical Gate Hooks |
 | `项目模板/scripts/init-project.sh` | 一键生成 `.aiops/` 骨架 | Project Initializer |
+| `grill-me/` `grilling/` | 需求拷问技能（来自 mattpocock/skills，见目录内 README） | Grilling Skills |
+| `开启提示词.txt` | 每次开新会话发给 AI 的开场白 | Session Opener |
 
 ## 术语表
 

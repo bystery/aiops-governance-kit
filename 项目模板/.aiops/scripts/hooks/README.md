@@ -7,9 +7,9 @@
 | `check-anchor.sh` | 非钩子——主控派发任务单前手动跑（30s） | 锚点在目标文件不唯一/不存在 | Edit 空跑/错位 |
 | `check-batch-limit.sh` | 非钩子——主控每次派活前手动跑（30s） | 本会话运行计数 ≥5 批仍派活（第 5 批完成即拒绝第 6 批派活；只数 `- B<n> \|` 批次行，投影/微调/并行开闸/零产出轮等记账行不计） | 单会话超批派活 |
 | `check-lean.sh` | 非钩子——版本升版收尾前手动跑 | 三常读合计超硬顶或超基线 tag | 治根文件反胖 |
-| `check-grill-skill.sh` | 非钩子——需求对齐拷问开工前必跑 | grilling 缺失/空/指纹不符 = 硬红；grill-me 缺失只警告 | 拷问方法论不落地（需求书1） |
-| `install-grill-skill.sh` | 非钩子——新项目初始化后跑一次 | 钉死 commit 下载 grill-me+grilling 到 .aiops/skills/ 并指纹自检（联网硬前提） | 需求书1：写死从网上下载 |
-| `check-files-budget.sh` | **pre-commit 内置执行**（mode=diff）+ 收尾手动（mode=all） | 见 pre-commit 行内七判据（A-G） | 文件爆炸与乱放（需求书4/5/6） |
+| `check-grill-skill.sh` | 非钩子——需求对齐拷问开工前必跑 | grilling 缺失/空/指纹不符 = 硬红；grill-me 缺失只警告 | 拷问方法论不落地 |
+| `install-grill-skill.sh` | 非钩子——新项目初始化后跑一次 | 钉死 commit 下载 grill-me+grilling 到 .aiops/skills/ 并指纹自检（联网硬前提） | 写死从网上下载，防换皮 |
+| `check-files-budget.sh` | **pre-commit 内置执行**（mode=diff）+ 收尾手动（mode=all） | 见 pre-commit 行内七判据（A-G） | 文件爆炸与乱放 |
 
 ## 激活（克隆后一次性执行）
 
