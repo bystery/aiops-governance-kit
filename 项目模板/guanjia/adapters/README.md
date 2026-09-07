@@ -19,4 +19,4 @@ node guanjia/bin/guanjia.mjs host-event --input '{"nonce":"zcode-demo-001","even
 node guanjia/bin/guanjia.mjs doctor --json
 ```
 
-探针只记录回执，不自动执行用户任务；未收到同 nonce 的真实事件前，doctor 必须显示 `unverified`。
+探针只记录回执，不自动执行用户任务；回执还必须匹配 nonce、宿主和事件契约。未收到符合契约的真实事件前，doctor 必须显示 `unverified`；收到坏回执则显示 `fail`，不能只看文件是否存在。

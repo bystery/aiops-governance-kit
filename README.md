@@ -58,7 +58,7 @@ node guanjia/bin/guanjia.mjs handoff
 - 证据门槛：验证记录保存实际 argv、退出码、超时、输出摘要、快照摘要和任务契约摘要；失败、超时、命令不存在、过期或未执行都不能登记为完成。
 - 基础提交检查：`check --scope staged --json` 会检查业务改动是否有任务、是否越界、是否有绑定当前暂存快照的 PASS 证据。
 - 提交检查接入：`hooks install` 会组合已有 `pre-commit`，保留原检查，不自动接管已有 `core.hooksPath`；doctor 只在真实包装器存在时显示已启用。
-- 宿主探针：`probe` / `host-event` 用唯一 nonce 记录真实事件回执；配置文件和模拟 JSON 不会被当成宿主已接入。
+- 宿主探针：`probe` / `host-event` 用唯一 nonce 记录真实事件回执，并校验 host/event 契约；配置文件、错误回执和模拟 JSON 不会被当成宿主已接入。
 - 宿主薄适配：提供可审查的 ZCode 本地 marketplace、Codex 项目 hooks 模板及 Node 桥接脚本；未完成宿主安装/信任和真实回执前保持 `unverified`。
 - 旧项目迁移：`migrate --from aiops` 默认只生成清单；显式 `--apply` 才复制历史资料，源 `.aiops/` 保留，重复迁移会报告冲突。
 - 卸载诊断与回退：`uninstall --dry-run` 只列出受管文件、入口区块和 hook；`hooks uninstall` 仅在 wrapper 未被用户修改时恢复原 `pre-commit`，不删除状态、证据或用户修改。

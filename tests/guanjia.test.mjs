@@ -254,6 +254,10 @@ test("宿主探针只有收到同 nonce 的真实回执才变为通过", async (
     await cli(project, ["probe", "--host", "zcode", "--nonce", nonce, "--json"]);
     const before = await cli(project, ["doctor", "--json"]);
     assert.equal(before.checks.find((item) => item.id === "host_hooks").status, "unverified");
+    const wrongHost = await cli(project, ["host-event", "--input", JSON.stringify({ nonce, event: "session_start", session_id: "wrong-host", host: "codex" }), "--json"], 4);
+    assert.match(wrongHost.error, /host 不匹配/);
+    const wrongEvent = await cli(project, ["host-event", "--input", JSON.stringify({ nonce, event: "not-a-real-event", session_id: "wrong-event", host: "zcode" }), "--json"], 4);
+    assert.match(wrongEvent.error, /不在宿主契约/);
     await cli(project, ["host-event", "--input", JSON.stringify({ nonce, event: "session_start", session_id: "real-session-1", host: "zcode" }), "--json"]);
     const after = await cli(project, ["doctor", "--json"]);
     assert.equal(after.checks.find((item) => item.id === "host_hooks").status, "pass");
