@@ -10,12 +10,13 @@
 - M0 回归：已有规则不覆盖、特殊字符项目名、重复安装、用户暂停、坏状态/缺资源等核心 fixture。
 - M3/M4 增量：ZCode/Codex 适配契约、唯一 nonce 宿主探针、真实回执记录、组合式 pre-commit 安装和 doctor 生效判断。
 - M5 增量：`.aiops` 迁移 dry-run、显式 apply、冲突识别、源目录保留和卸载前清单。
+- M6 增量：安装器复制单一 Node 核心、PowerShell/CMD/POSIX 薄包装器、generic/Qoder/WorkBuddy 适配契约，以及从项目外工作目录调用的回归测试。
 
 ## 尚未落地或尚未实测
 
 - ZCode 插件/marketplace、Codex 生命周期 hook 和跨客户端自动注入；当前只有适配契约和可调用探针，尚未取得真实客户端回执。
 - 完整的 `.aiops` 语义迁移/卸载事务；当前版本只安全复制历史、登记索引并提供卸载 dry-run，不会自动删除或覆盖。
-- Windows 原生与 macOS Finder ZIP 解压实机验证。
+- Windows PowerShell/CMD 原生和 macOS Finder ZIP 解压实机验证仍待用户环境确认；仓库已提供对应入口与 Linux shell smoke test。
 - Husky 等动态 hook 管理器的长期稳定性；`hooks install` 会保留已有检查并组合运行，但不会静默修改已有 `core.hooksPath` 配置。
 
 ## 回退入口

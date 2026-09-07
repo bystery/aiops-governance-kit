@@ -894,7 +894,7 @@ async function uninstallPlan(project) {
 async function main(argv) {
   const command = argv[0];
   const { positional, options } = parseArgs(argv.slice(1));
-  if (!command) throw new GuanjiaError("用法：guanjia <init|doctor|status|context|task|checkpoint|resume|handoff|verify|check|hooks|probe|host-event>", EXIT.INPUT);
+  if (!command) throw new GuanjiaError("用法：guanjia <init|doctor|status|context|task|checkpoint|resume|handoff|verify|check|hooks|probe|host-event|migrate|uninstall>", EXIT.INPUT);
   if (command === "init") {
     const project = required(options, "project");
     const result = await install(project, options.name || positional[0], options.host || "generic", Boolean(options["dry-run"]));
