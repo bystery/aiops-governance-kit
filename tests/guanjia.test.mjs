@@ -140,6 +140,26 @@ test("交接、用户暂停和新会话恢复可观察且不会自动解除暂�
   }
 });
 
+test("旧 HANDOFF 会被 resume 识别为需要复核", async () => {
+  const project = await mkdtemp(join(tmpdir(), "guanjia-stale-handoff-"));
+  try {
+    await run("sh", [INSTALLER, project, "旧交接测试", "generic"], project);
+    const started = await cli(project, ["task", "start", "--input", JSON.stringify({ goal: "检查旧交接", allowed_paths: ["docs/**"], acceptance: ["交接可识别" ] }), "--json"]);
+    await cli(project, ["checkpoint", "--input", JSON.stringify({ summary: "已保存检查点", next_action: "核对交接" }), "--json"]);
+    await cli(project, ["handoff", "--json"]);
+    const handoffPath = join(project, "guanjia", "HANDOFF.md");
+    const handoff = await readFile(handoffPath, "utf8");
+    await writeFile(handoffPath, handoff.replace(/revision=\d+/, "revision=999"), "utf8");
+    const resumed = await cli(project, ["resume", "--json"]);
+    assert.equal(resumed.action, "needs_review");
+    assert.match(resumed.reasons.join(" "), /HANDOFF.md 已过期/);
+    assert.equal(resumed.handoff.status, "stale");
+    assert.equal(started.ok, true);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
 test("暂存业务改动没有证据不能放行，验证证据必须绑定暂存快照", async () => {
   const project = await mkdtemp(join(tmpdir(), "guanjia-gate-"));
   try {
