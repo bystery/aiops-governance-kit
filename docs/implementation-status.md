@@ -15,7 +15,7 @@
 ## 尚未落地或尚未实测
 
 - ZCode/Codex 插件启用、信任和跨客户端自动注入仍未完成真实实测；当前已提供可审查的适配包和桥接脚本，尚未取得真实客户端回执。
-- 完整的 `.aiops` 语义迁移/卸载事务；当前版本只安全复制历史、登记索引并提供卸载 dry-run，不会自动删除或覆盖。
+- 完整的 `.aiops` 语义迁移/卸载事务；当前版本只安全复制历史、登记索引并提供卸载 dry-run。提交 hook 已支持受保护的 `hooks uninstall` 回退，但不会自动删除状态、证据或覆盖用户修改。
 - Windows PowerShell/CMD 原生和 macOS Finder ZIP 解压实机验证仍待用户环境确认；仓库已提供对应入口与 Linux shell smoke test。
 - Husky 等动态 hook 管理器的长期稳定性；`hooks install` 会保留已有检查并组合运行，但不会静默修改已有 `core.hooksPath` 配置。
 

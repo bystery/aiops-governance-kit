@@ -218,6 +218,29 @@ test("提交检查接入会保留原 hook，不把配置存在冒充生效", asy
     assert.match(await readFile(original, "utf8"), /GUANJIA PRE-COMMIT WRAPPER/);
     const doctor = await cli(project, ["doctor", "--json"]);
     assert.equal(doctor.checks.find((item) => item.id === "submit_gate").status, "pass");
+    const uninstalled = await cli(project, ["hooks", "uninstall", "--json"]);
+    assert.equal(uninstalled.status, "uninstalled");
+    assert.equal(await readFile(original, "utf8"), "#!/bin/sh\necho ORIGINAL-HOOK\n");
+    const after = await cli(project, ["doctor", "--json"]);
+    assert.equal(after.checks.find((item) => item.id === "submit_gate").status, "warn");
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("卸载发现用户改过管家 wrapper 时拒绝覆盖", async () => {
+  const project = await mkdtemp(join(tmpdir(), "guanjia-hooks-conflict-"));
+  try {
+    await gitInit(project);
+    await run("sh", [INSTALLER, project, "hook 冲突", "generic"], project);
+    await run("git", ["add", "guanjia", "AGENTS.md"], project);
+    await run("git", ["commit", "-qm", "install guanjia"], project);
+    await cli(project, ["hooks", "install", "--json"]);
+    const preCommit = join(project, ".git", "hooks", "pre-commit");
+    await writeFile(preCommit, `${await readFile(preCommit, "utf8")}\n# user edit\n`, "utf8");
+    const result = await cli(project, ["hooks", "uninstall", "--json"], 4);
+    assert.match(result.error, /wrapper 已被用户修改/);
+    assert.match(await readFile(preCommit, "utf8"), /user edit/);
   } finally {
     await rm(project, { recursive: true, force: true });
   }

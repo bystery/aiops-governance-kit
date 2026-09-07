@@ -9,6 +9,7 @@
 - 暂停/交接：node guanjia/bin/guanjia.mjs handoff
 - 继续工作：先读取本文件、guanjia/state.json 和生成的 guanjia/HANDOFF.md。
 - 提交检查：node guanjia/bin/guanjia.mjs hooks install
+- 回退提交检查：node guanjia/bin/guanjia.mjs hooks uninstall
 - 宿主探针：node guanjia/bin/guanjia.mjs probe --host <zcode|codex> --nonce <唯一值>
 - ZCode/Codex 适配：读取 guanjia/adapters/README.md，按宿主要求启用/信任后再做真实探针
 
