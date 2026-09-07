@@ -62,7 +62,7 @@ node guanjia/bin/guanjia.mjs handoff
 - 诊断状态：`doctor` 明确返回 `pass`、`needs_action` 或 `fail`；普通模式允许展示待处理项，`doctor --strict` 在未全绿时返回非零，避免把 warning/unverified 误解为已完成。
 - 宿主薄适配：提供可审查的 ZCode 本地 marketplace、Codex 项目 hooks 模板及 Node 桥接脚本；未完成宿主安装/信任和真实回执前保持 `unverified`。
 - 旧项目迁移：`migrate --from aiops` 默认只生成清单；显式 `--apply` 才复制历史资料，源 `.aiops/` 保留，重复迁移会报告冲突。
-- 卸载诊断与回退：`uninstall --dry-run` 只列出受管文件、入口区块和 hook；`hooks uninstall` 仅在 wrapper 未被用户修改时恢复原 `pre-commit`，不删除状态、证据或用户修改。
+- 卸载诊断与回退：`uninstall --dry-run` 只列出受管文件、入口区块和 hook；显式 `uninstall --apply` 会先校验摘要，冲突时保留现场，成功时只移除未修改的受管资源并保留状态、证据、迁移归档和用户内容；`hooks uninstall` 仍仅在 wrapper 未被用户修改时恢复原 `pre-commit`。
 - 跨平台入口：提供 PowerShell、CMD 和 POSIX shell 薄包装器；核心逻辑仍只有一份，并显式固定 `--project`。
 - 宿主适配契约：补齐 generic、Qoder、WorkBuddy 的事件契约；接入事件只记录精简诊断信息，不保存原始 prompt；未收到真实 nonce 回执的宿主仍保持 `unverified`。
 

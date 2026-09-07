@@ -462,6 +462,43 @@ test("迁移遇到未知政策或目标写入故障时只返回冲突并回退�
   }
 });
 
+test("卸载默认只预览，apply 会保留状态历史并移除未修改的受管资源", async () => {
+  const project = await mkdtemp(join(tmpdir(), "guanjia-uninstall-"));
+  try {
+    await gitInit(project);
+    await run("sh", [INSTALLER, project, "卸载测试", "generic"], project);
+    const preview = await cli(project, ["uninstall", "--json"]);
+    assert.equal(preview.status, "dry_run_only");
+    assert.equal(await exists(join(project, "guanjia", "bin", "guanjia.mjs")), true);
+    const applied = await cli(project, ["uninstall", "--apply", "--json"]);
+    assert.equal(applied.status, "applied");
+    assert.equal(applied.removed_agents_block, true);
+    assert.equal(await exists(join(project, "guanjia", "bin", "guanjia.mjs")), false);
+    assert.equal(await exists(join(project, "guanjia", "state.json")), true);
+    assert.equal(await exists(join(project, "guanjia", "records")), true);
+    assert.doesNotMatch(await readFile(join(project, "AGENTS.md"), "utf8"), /GUANJIA BEGIN/);
+    assert.equal(await exists(join(project, "guanjia", "runtime", "uninstall-backups")), true);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("卸载发现用户修改的受管文件时拒绝并保留现场", async () => {
+  const project = await mkdtemp(join(tmpdir(), "guanjia-uninstall-conflict-"));
+  try {
+    await run("sh", [INSTALLER, project, "卸载冲突", "generic"], project);
+    const managed = join(project, "guanjia", "START.md");
+    await writeFile(managed, "用户手工修改\n", "utf8");
+    const result = await cli(project, ["uninstall", "--apply", "--json"], 4);
+    assert.equal(result.status, "conflict");
+    assert.match(result.conflicts.map((item) => item.path).join(" "), /guanjia\/START.md/);
+    assert.equal(await readFile(managed, "utf8"), "用户手工修改\n");
+    assert.match(await readFile(join(project, "AGENTS.md"), "utf8"), /GUANJIA BEGIN/);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
 test("没有任务契约的业务暂存改动不能假绿", async () => {
   const project = await mkdtemp(join(tmpdir(), "guanjia-no-task-"));
   try {
