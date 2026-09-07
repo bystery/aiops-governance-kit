@@ -1,0 +1,14 @@
+{
+  "host": "codex",
+  "version": "unverified",
+  "status": "unverified",
+  "events": ["session_start", "user_prompt", "compaction_resume", "stop"],
+  "transport": "host-lifecycle-hook",
+  "stdout": "protocol-only",
+  "stderr": "diagnostic-only",
+  "notes": [
+    "宿主信任/启用状态必须由 Codex 原生界面完成。",
+    "未信任时只能显示手动恢复降级，不能宣称自动接入。",
+    "压缩后恢复必须重新核对 state revision、权限范围和暂停状态。"
+  ]
+}

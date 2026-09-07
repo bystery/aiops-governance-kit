@@ -8,6 +8,8 @@
 - 恢复任务：node guanjia/bin/guanjia.mjs resume --json
 - 暂停/交接：node guanjia/bin/guanjia.mjs handoff
 - 继续工作：先读取本文件、guanjia/state.json 和生成的 guanjia/HANDOFF.md。
+- 提交检查：node guanjia/bin/guanjia.mjs hooks install
+- 宿主探针：node guanjia/bin/guanjia.mjs probe --host <zcode|codex> --nonce <唯一值>
 
 ## 边界
 

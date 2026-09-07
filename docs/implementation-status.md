@@ -8,13 +8,14 @@
 - M2 核心部分：`state.json`、revision 乐观并发检查、本地锁、checkpoint、handoff、resume、状态面板和固定交接模板。
 - M4 基础部分：任务范围/完成标准/复用字段、结构化验证证据、argv 执行、超时与快照绑定、暂存区检查。
 - M0 回归：已有规则不覆盖、特殊字符项目名、重复安装、用户暂停、坏状态/缺资源等核心 fixture。
+- M3/M4 增量：ZCode/Codex 适配契约、唯一 nonce 宿主探针、真实回执记录、组合式 pre-commit 安装和 doctor 生效判断。
 
 ## 尚未落地或尚未实测
 
-- ZCode 插件/marketplace、Codex 生命周期 hook 和跨宿主真实 nonce 探针。
+- ZCode 插件/marketplace、Codex 生命周期 hook 和跨客户端自动注入；当前只有适配契约和可调用探针，尚未取得真实客户端回执。
 - `.aiops` 到 `guanjia` 的迁移/卸载事务。
 - Windows 原生与 macOS Finder ZIP 解压实机验证。
-- 现有 Husky、core.hooksPath 等提交系统的安全组合；`check` 当前提供可调用的基础检查，但安装器不会静默接管已有 hook。
+- Husky 等动态 hook 管理器的长期稳定性；`hooks install` 会保留已有检查并组合运行，但不会静默修改已有 `core.hooksPath` 配置。
 
 ## 回退入口
 

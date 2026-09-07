@@ -344,6 +344,10 @@ const STATIC_RESOURCE_PATHS = [
   "rules/core.md",
   "rules/worker.md",
   "templates/HANDOFF.md",
+  "adapters/README.md",
+  "adapters/zcode/hooks.json",
+  "adapters/codex/hooks.json",
+  "hooks/README.md",
   "runtime/.gitignore",
   "records/requests/.gitkeep",
   "records/evidence/.gitkeep",
@@ -428,6 +432,111 @@ async function verifyManifest(project) {
   return { status: "pass", message: "资源清单与文件一致" };
 }
 
+function safeNonce(value) {
+  const nonce = String(value || "");
+  if (!/^[A-Za-z0-9._-]{8,128}$/.test(nonce)) {
+    throw new GuanjiaError("nonce 只能包含字母、数字、点、下划线和短横线，长度 8–128。", EXIT.INPUT);
+  }
+  return nonce;
+}
+
+async function hookDetails(root) {
+  const info = await gitInfo(root);
+  if (!info.available) return { available: false, configured: null, hooks_dir: null, pre_commit: null };
+  const configured = await git(root, ["config", "--get", "core.hooksPath"]).catch(() => null);
+  const raw = configured || await git(root, ["rev-parse", "--git-path", "hooks"]);
+  const hooksDir = resolve(root, raw);
+  const preCommit = join(hooksDir, "pre-commit");
+  return { available: true, configured: configured || null, hooks_dir: hooksDir, pre_commit: preCommit, exists: await exists(preCommit), managed: (await exists(preCommit)) && (await readText(preCommit)).includes("GUANJIA PRE-COMMIT WRAPPER") };
+}
+
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", "'\\''")}'`;
+}
+
+function hookWrapper() {
+  return `#!/bin/sh
+# GUANJIA PRE-COMMIT WRAPPER
+set -u
+HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+ORIGINAL="$HOOK_DIR/pre-commit.guanjia-original"
+if [ -f "$ORIGINAL" ]; then
+  if [ -x "$ORIGINAL" ]; then
+    "$ORIGINAL" "$@"
+  else
+    sh "$ORIGINAL" "$@"
+  fi
+  rc=$?
+  [ "$rc" -eq 0 ] || exit "$rc"
+fi
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 6
+command -v node >/dev/null 2>&1 || { echo "[guanjia] 缺少 Node.js，无法执行提交检查。" >&2; exit 3; }
+exec node "$PROJECT_ROOT/guanjia/bin/guanjia.mjs" check --scope staged --json
+`;
+}
+
+async function installHooks(project) {
+  const details = await hookDetails(project.root);
+  if (!details.available) throw new GuanjiaError("当前目录不是 Git 仓库，不能安装提交检查。", EXIT.CAPABILITY);
+  await fs.mkdir(details.hooks_dir, { recursive: true });
+  if (details.managed) return { ok: true, status: "already_installed", ...details };
+  const original = join(details.hooks_dir, "pre-commit.guanjia-original");
+  let preserved = false;
+  if (details.exists) {
+    if (await exists(original)) throw new GuanjiaError("已存在管家保存的原 pre-commit，拒绝二次覆盖。", EXIT.CONFLICT);
+    const stat = await fs.stat(details.pre_commit);
+    await fs.copyFile(details.pre_commit, original);
+    await fs.chmod(original, stat.mode & 0o777);
+    preserved = true;
+  }
+  await writeAtomic(details.pre_commit, hookWrapper());
+  await fs.chmod(details.pre_commit, 0o755);
+  const config = structuredClone(project.config);
+  config.updated_at = now();
+  config.capabilities = { ...(config.capabilities || {}), submit_gate: "installed" };
+  await writeJsonAtomic(project.configPath, config);
+  return { ok: true, status: "installed", hooks_dir: details.hooks_dir, pre_commit: details.pre_commit, preserved_existing_hook: preserved, existing_hooks_path: details.configured };
+}
+
+async function adapterManifest(project, host) {
+  const path = join(project.guanjia, "adapters", host, "hooks.json");
+  if (await exists(path)) return readJson(path, `guanjia/adapters/${host}/hooks.json`);
+  return { host, version: "unknown", events: ["session_start", "user_prompt", "tool_after", "stop"], status: "unverified" };
+}
+
+async function probeHost(project, host, requestedNonce) {
+  const nonce = safeNonce(requestedNonce || `probe-${Date.now()}-${randomUUID().slice(0, 8)}`);
+  const manifest = await adapterManifest(project, host);
+  const expected = { schema_version: 1, nonce, host, created_at: now(), expected_events: manifest.events || [], status: "pending", note: "只有收到同 nonce 的真实 host-event 回执后才算通过" };
+  await writeJsonAtomic(join(project.guanjia, "runtime", "probes", `${nonce}.json`), expected);
+  return { ok: true, status: "pending", nonce, host, expected_events: expected.expected_events, instructions: `在真实 ${host} 会话中触发事件后，用同一 nonce 调用 host-event；不要把配置文件存在当作探针通过。` };
+}
+
+async function hostEvent(project, input) {
+  const nonce = safeNonce(input.nonce);
+  const expectedPath = join(project.guanjia, "runtime", "probes", `${nonce}.json`);
+  if (!(await exists(expectedPath))) throw new GuanjiaError(`没有找到 nonce=${nonce} 的待验证探针。`, EXIT.CONFLICT);
+  const expected = await readJson(expectedPath, "探针预期");
+  const receipt = { schema_version: 1, nonce, host: input.host || expected.host, event: required(input, "event"), session_id: input.session_id || null, received_at: now(), source: input.source || "host-adapter", status: "received" };
+  await writeJsonAtomic(join(project.guanjia, "runtime", "probes", `${nonce}.receipt.json`), receipt);
+  return { ok: true, status: "received", nonce, event: receipt.event, session_id: receipt.session_id };
+}
+
+async function hostProbeStatus(project) {
+  const dir = join(project.guanjia, "runtime", "probes");
+  if (!(await exists(dir))) return { status: "unverified", message: "尚未运行宿主探针" };
+  const names = await fs.readdir(dir);
+  const pending = [];
+  const received = [];
+  for (const name of names.filter((item) => item.endsWith(".json") && !item.endsWith(".receipt.json"))) {
+    const nonce = name.slice(0, -5);
+    if (await exists(join(dir, `${nonce}.receipt.json`))) received.push(nonce);
+    else pending.push(nonce);
+  }
+  if (received.length) return { status: "pass", message: "已收到至少一条真实探针回执", received, pending };
+  return { status: "unverified", message: pending.length ? "探针已发出但尚未收到真实宿主回执" : "尚未运行宿主探针", pending };
+}
+
 async function doctor(project) {
   const checks = [];
   const add = (id, status, message, details = undefined) => checks.push({ id, status, message, ...(details ? { details } : {}) });
@@ -439,10 +548,10 @@ async function doctor(project) {
   add("entry", agents.includes(MANAGED_BEGIN) && agents.includes(MANAGED_END) ? "pass" : "fail", "项目入口受管区块已存在");
   const info = await gitInfo(project.root);
   add("git", info.available ? "pass" : "warn", info.available ? "已发现 Git 仓库，可记录分支与现场。" : "未发现 Git 仓库；本地状态可用，版本备份不可用。");
-  let hooksPath = null;
-  if (info.available) hooksPath = await git(project.root, ["config", "--get", "core.hooksPath"]).catch(() => null);
-  add("submit_gate", hooksPath ? "unknown" : "warn", hooksPath ? `发现已有 hooksPath：${hooksPath}；尚未证明它与管家检查组合。` : "提交检查尚未启用；不能把静态文件生成当成提交门禁生效。");
-  add("host_hooks", "unverified", `宿主 ${project.config.host || "generic"} 的真实事件触发尚未验证。`);
+  const hooks = await hookDetails(project.root);
+  add("submit_gate", hooks.managed ? "pass" : hooks.configured ? "unknown" : "warn", hooks.managed ? "pre-commit 已安装管家检查，并保留原有检查链。" : hooks.configured ? `发现已有 hooksPath：${hooks.configured}；尚未证明它与管家检查组合。` : "提交检查尚未启用；不能把静态文件生成当成提交门禁生效。");
+  const probe = await hostProbeStatus(project);
+  add("host_hooks", probe.status, `${project.config.host || "generic"}：${probe.message}`, probe);
   if (await exists(join(project.root, ".aiops"))) add("legacy", "warn", "发现旧 .aiops/；本次保留原目录，未自动迁移。");
   return { ok: checks.every((item) => item.status !== "fail"), project: project.root, project_id: project.config.project_id, revision: project.state.revision, checks };
 }
@@ -691,7 +800,7 @@ async function checkStaged(project) {
 async function main(argv) {
   const command = argv[0];
   const { positional, options } = parseArgs(argv.slice(1));
-  if (!command) throw new GuanjiaError("用法：guanjia <init|doctor|status|context|task|checkpoint|resume|handoff|verify|check>", EXIT.INPUT);
+  if (!command) throw new GuanjiaError("用法：guanjia <init|doctor|status|context|task|checkpoint|resume|handoff|verify|check|hooks|probe|host-event>", EXIT.INPUT);
   if (command === "init") {
     const project = required(options, "project");
     const result = await install(project, options.name || positional[0], options.host || "generic", Boolean(options["dry-run"]));
@@ -718,6 +827,9 @@ async function main(argv) {
   if (command === "resume") { const result = await resume(project); console.log(json(result)); return result; }
   if (command === "checkpoint") { const result = await checkpoint(project, options.input ? parseInput(options) : {}); console.log(json(result)); return result; }
   if (command === "handoff") { const result = await checkpoint(project, options.input ? parseInput(options) : {}, true); console.log(json(result)); return result; }
+  if (command === "hooks" && positional[0] === "install") { const result = await installHooks(project); console.log(json(result)); return result; }
+  if (command === "probe") { const result = await probeHost(project, options.host || project.config.host || "generic", options.nonce); console.log(json(result)); return result; }
+  if (command === "host-event") { const result = await hostEvent(project, parseInput(options)); console.log(json(result)); return result; }
   if (command === "task" && positional[0] === "start") { const input = parseInput(options); const result = await startTask(project, input, input.expected_revision); console.log(json(result)); return result; }
   if (command === "task" && positional[0] === "transition") { const input = parseInput(options); const result = await transitionTask(project, input); console.log(json(result)); return result; }
   if (command === "verify") { const result = await verify(project, parseInput(options)); console.log(json(result)); if (!result.ok) process.exitCode = EXIT.CHECK; return result; }

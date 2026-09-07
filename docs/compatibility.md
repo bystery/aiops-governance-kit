@@ -5,8 +5,8 @@
 | 宿主 | 当前状态 | 说明 |
 |---|---|---|
 | Generic/manual | 已实现 | 可在任意能运行 Node.js 的项目中手动调用 init、status、checkpoint、handoff、resume、verify、check |
-| ZCode | 未验证 | 需要真实版本、插件加载链、新会话 nonce 和无害阻断探针；本仓库暂不把项目文件当作已注册 hook |
-| Codex | 未验证 | 需要宿主信任/启用后的真实 SessionStart、用户输入和压缩恢复事件；未信任时应显示降级 |
+| ZCode | 契约已提供，真实接入未验证 | `guanjia/adapters/zcode/hooks.json` 描述事件；用 `probe`/`host-event` 记录真实 nonce 回执；项目文件不等于用户级插件注册 |
+| Codex | 契约已提供，真实接入未验证 | `guanjia/adapters/codex/hooks.json` 描述事件；需要宿主信任/启用后的真实 SessionStart、用户输入和压缩恢复回执 |
 | Qoder IDE | 未验证 | IDE 事件和 CLI 不应混用；后续单独适配 |
 | WorkBuddy | 未验证 | 需要确认具体桌面版/企业版和配置作用域 |
 
