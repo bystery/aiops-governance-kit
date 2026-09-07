@@ -604,6 +604,15 @@ function nextId(prefix, state) {
   return `${prefix}-${String(number).padStart(3, "0")}`;
 }
 
+function taskContractDigest(task) {
+  return hashText(JSON.stringify({
+    task_id: task.id,
+    allowed_paths: task.allowed_paths || [],
+    acceptance_revision: task.acceptance_revision,
+    acceptance: task.acceptance || [],
+  }));
+}
+
 function validateTaskInput(input) {
   if (!input || typeof input !== "object") throw new GuanjiaError("任务输入必须是 JSON 对象。", EXIT.INPUT);
   if (!String(input.goal || "").trim()) throw new GuanjiaError("任务缺少 goal。", EXIT.INPUT);
@@ -680,7 +689,7 @@ async function transitionTask(project, input) {
     for (const ref of evidenceRefs) {
       const evidencePath = join(project.guanjia, "records", "evidence", `${ref}.json`);
       const evidence = await readJson(evidencePath, ref);
-      if (evidence.status !== "PASS" || evidence.task_id !== task.id || evidence.acceptance_revision !== task.acceptance_revision) {
+      if (evidence.status !== "PASS" || evidence.task_id !== task.id || evidence.acceptance_revision !== task.acceptance_revision || evidence.contract_digest !== taskContractDigest(task)) {
         throw new GuanjiaError(`证据 ${ref} 不是当前任务的有效 PASS。`, EXIT.CHECK);
       }
     }
@@ -767,13 +776,14 @@ async function verify(project, input) {
     evidence_id: evidenceId,
     task_id: task.id,
     acceptance_revision: task.acceptance_revision,
-    status: result.exit_code === 0 && !result.timed_out && before === after ? "PASS" : result.timed_out ? "NOT_RUN" : "FAIL",
+    status: result.exit_code === null || result.timed_out ? "NOT_RUN" : result.exit_code === 0 && before === after ? "PASS" : "FAIL",
     command: { executable: input.command.executable, args: input.command.args, cwd: input.command.cwd || ".", timeout_ms: Number(input.command.timeout_ms || 300000) },
     exit_code: result.exit_code,
     timed_out: result.timed_out,
     stdout: result.stdout.slice(-20000),
     stderr: result.stderr.slice(-20000),
     snapshot_digest: before,
+    contract_digest: taskContractDigest(task),
     created_at: now(),
     note: before === after ? "被测暂存快照在验证前后未变化" : "验证期间暂存快照变化，证据失效",
   };
@@ -804,7 +814,7 @@ async function checkStaged(project) {
     const evidencePath = `guanjia/records/evidence/${ref}.json`;
     if (!evidenceFiles.has(evidencePath)) continue;
     const evidence = await readJson(join(project.guanjia, "records", "evidence", `${ref}.json`), ref);
-    if (evidence.status === "PASS" && evidence.task_id === task.id && evidence.acceptance_revision === task.acceptance_revision && evidence.snapshot_digest === digest) valid.push(ref);
+    if (evidence.status === "PASS" && evidence.task_id === task.id && evidence.acceptance_revision === task.acceptance_revision && evidence.contract_digest === taskContractDigest(task) && evidence.snapshot_digest === digest) valid.push(ref);
   }
   if (!valid.length) return { ok: false, result: "NOT_RUN", reason: "没有绑定当前暂存快照的有效 PASS 证据；未执行、失败或过期证据不能放行。", snapshot_digest: digest };
   return { ok: true, result: "PASS", reason: "任务范围、验证证据和暂存快照已绑定", evidence_refs: valid, snapshot_digest: digest };
