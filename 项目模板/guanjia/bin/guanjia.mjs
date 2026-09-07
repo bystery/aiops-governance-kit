@@ -1172,11 +1172,76 @@ async function migrateLegacy(project, apply) {
   }
 }
 
-async function uninstallPlan(project) {
+function removeManagedBlock(content) {
+  const block = managedBlock();
+  if (!content.includes(MANAGED_BEGIN) && !content.includes(MANAGED_END)) return { changed: false, content };
+  if (!content.includes(block)) {
+    throw new GuanjiaError("AGENTS.md 的管家受管区块已被手工修改，拒绝卸载覆盖。", EXIT.CONFLICT);
+  }
+  const next = content.replace(new RegExp(`\\n?${MANAGED_BEGIN}[\\s\\S]*?${MANAGED_END}\\n?`, "m"), "\n").replace(/\n{3,}/g, "\n\n");
+  return { changed: next !== content, content: next.trim() ? `${next.trimEnd()}\n` : "" };
+}
+
+async function uninstallPlan(project, apply = false) {
   const manifestPath = join(project.guanjia, "manifest.json");
-  const managedFiles = await exists(manifestPath) ? Object.keys((await readJson(manifestPath, "guanjia/manifest.json")).files || {}) : [];
+  const manifest = await exists(manifestPath) ? await readJson(manifestPath, "guanjia/manifest.json") : { files: {} };
+  const managedFiles = Object.keys(manifest.files || {});
   const agents = await exists(join(project.root, "AGENTS.md")) ? await readText(join(project.root, "AGENTS.md")) : "";
-  return { ok: true, status: "dry_run_only", managed_files: managedFiles, has_managed_agents_block: agents.includes(MANAGED_BEGIN) && agents.includes(MANAGED_END), hook: await hookDetails(project.root), warning: "初版卸载只生成清单，不删除状态、证据、交接历史或用户修改。" };
+  const conflicts = [];
+  for (const [relativePath, expected] of Object.entries(manifest.files || {})) {
+    const full = join(project.root, relativePath);
+    if (await exists(full) && (await sha256File(full)) !== expected) conflicts.push({ path: relativePath, reason: "受管文件已被手工修改" });
+  }
+  const blockPresent = agents.includes(MANAGED_BEGIN) || agents.includes(MANAGED_END);
+  if (blockPresent && !agents.includes(managedBlock())) conflicts.push({ path: "AGENTS.md", reason: "管家受管区块已被手工修改" });
+  const hook = await hookDetails(project.root);
+  if (hook.managed && (await readText(hook.pre_commit)) !== hookWrapper()) conflicts.push({ path: relative(project.root, hook.pre_commit), reason: "管家 pre-commit wrapper 已被手工修改" });
+  const plan = {
+    status: conflicts.length ? "conflict" : apply ? "ready_to_apply" : "dry_run_only",
+    managed_files: managedFiles,
+    has_managed_agents_block: agents.includes(MANAGED_BEGIN) && agents.includes(MANAGED_END),
+    hook,
+    conflicts,
+    preserved: ["guanjia/config.json", "guanjia/state.json", "guanjia/records/", "guanjia/archive/", "旧 .aiops/ 目录", "AGENTS.md 受管区块外内容"],
+    warning: "卸载不会删除状态、证据、交接历史、迁移归档或用户修改；仅移除未被修改的受管资源。",
+  };
+  if (!apply || conflicts.length) return { ok: conflicts.length === 0, ...plan };
+
+  const backupId = `UNINSTALL-${Date.now()}-${randomUUID().slice(0, 8)}`;
+  const backupRoot = join(project.guanjia, "runtime", "uninstall-backups", backupId);
+  const copied = [];
+  const removed = [];
+  const originalConfig = structuredClone(project.config);
+  const originalAgents = agents;
+  try {
+    for (const relativePath of managedFiles) {
+      const source = join(project.root, relativePath);
+      if (!(await exists(source))) continue;
+      const target = join(backupRoot, relativePath);
+      await fs.mkdir(dirname(target), { recursive: true });
+      await fs.copyFile(source, target);
+      copied.push({ source, target });
+    }
+    for (const relativePath of managedFiles) {
+      const target = join(project.root, relativePath);
+      if (await exists(target)) {
+        await fs.rm(target, { force: true });
+        removed.push(relativePath);
+      }
+    }
+    const agentsResult = removeManagedBlock(agents);
+    if (agentsResult.changed) await writeAtomic(join(project.root, "AGENTS.md"), agentsResult.content);
+    let hookResult = { status: "not_installed" };
+    if (hook.managed) hookResult = await uninstallHooks(project);
+    return { ok: true, ...plan, status: "applied", backup: relative(project.root, backupRoot), removed_files: removed, removed_agents_block: agentsResult.changed, hook: hookResult };
+  } catch (error) {
+    for (const item of copied.reverse()) {
+      if (await exists(item.target)) await fs.copyFile(item.target, item.source).catch(() => {});
+    }
+    if (originalAgents) await writeAtomic(join(project.root, "AGENTS.md"), originalAgents).catch(() => {});
+    await writeJsonAtomic(project.configPath, originalConfig).catch(() => {});
+    throw new GuanjiaError(`卸载失败，已尽力回退：${error.message}`, EXIT.ENVIRONMENT, { backup: relative(project.root, backupRoot), removed_files: removed });
+  }
 }
 
 async function main(argv) {
@@ -1216,7 +1281,7 @@ async function main(argv) {
   if (command === "probe") { const result = await probeHost(project, options.host || project.config.host || "generic", options.nonce); console.log(json(result)); return result; }
   if (command === "host-event") { const result = await hostEvent(project, parseInput(options)); console.log(json(result)); return result; }
   if (command === "migrate" && options.from === "aiops") { const result = await migrateLegacy(project, Boolean(options.apply)); console.log(json(result)); if (!result.ok) process.exitCode = result.status === "conflict" ? EXIT.CONFLICT : EXIT.CAPABILITY; return result; }
-  if (command === "uninstall") { const result = await uninstallPlan(project); console.log(json(result)); return result; }
+  if (command === "uninstall") { const result = await uninstallPlan(project, Boolean(options.apply)); console.log(json(result)); if (!result.ok) process.exitCode = EXIT.CONFLICT; return result; }
   if (command === "task" && positional[0] === "start") { const input = parseInput(options); const result = await startTask(project, input, input.expected_revision); console.log(json(result)); return result; }
   if (command === "task" && positional[0] === "revise") { const result = await reviseTask(project, parseInput(options)); console.log(json(result)); return result; }
   if (command === "task" && positional[0] === "transition") { const input = parseInput(options); const result = await transitionTask(project, input); console.log(json(result)); return result; }

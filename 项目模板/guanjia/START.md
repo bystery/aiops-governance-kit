@@ -12,6 +12,7 @@
 - 修改目标或验收标准：通过 `task revise` 修订任务契约；修订后旧验证证据会自动失效，必须重新验证。
 - 提交检查：node guanjia/bin/guanjia.mjs hooks install
 - 回退提交检查：node guanjia/bin/guanjia.mjs hooks uninstall
+- 预览/执行卸载：node guanjia/bin/guanjia.mjs uninstall --dry-run --json；确认后加 `--apply`。用户手工修改的受管文件会触发冲突并保留现场。
 - 宿主探针：node guanjia/bin/guanjia.mjs probe --host <zcode|codex> --nonce <唯一值>
 - ZCode/Codex 适配：读取 guanjia/adapters/README.md，按宿主要求启用/信任后再做真实探针
 
