@@ -734,6 +734,7 @@ function nextId(prefix, state) {
 function taskContractDigest(task) {
   return hashText(JSON.stringify({
     task_id: task.id,
+    goal: task.goal,
     allowed_paths: task.allowed_paths || [],
     acceptance_revision: task.acceptance_revision,
     acceptance: task.acceptance || [],
@@ -786,6 +787,49 @@ async function startTask(project, input, expectedRevision) {
   const updated = await loadProject(project.root);
   await renderDerived(updated, next);
   return { ok: true, task, revision: next.revision, request_ref: stateRef(next.authority.source_ref) };
+}
+
+async function reviseTask(project, input) {
+  const current = project.state.task;
+  if (!current || current.id !== input.task_id) throw new GuanjiaError("当前状态没有匹配的活跃任务。", EXIT.CONFLICT);
+  const contractFields = ["goal", "allowed_paths", "acceptance", "risk", "verification_mode"];
+  if (!contractFields.some((field) => input[field] !== undefined)) throw new GuanjiaError("任务修订至少要提供一个契约字段。", EXIT.INPUT);
+  const candidate = {
+    ...current,
+    goal: input.goal ?? current.goal,
+    allowed_paths: input.allowed_paths ?? current.allowed_paths,
+    acceptance: input.acceptance ?? current.acceptance,
+    risk: input.risk ?? current.risk,
+    verification_mode: input.verification_mode ?? current.verification_mode,
+  };
+  validateTaskInput(candidate);
+  const requestId = input.request_id || nextId("R", project.state);
+  await writeJsonAtomic(join(project.guanjia, "records", "requests", `${requestId}.json`), {
+    schema_version: 1,
+    request_id: requestId,
+    type: "task_revision",
+    captured_at: now(),
+    previous_contract_digest: taskContractDigest(current),
+    input,
+  });
+  const next = await mutateState(project, input.expected_revision, (state) => {
+    const task = state.task;
+    task.goal = candidate.goal;
+    task.allowed_paths = candidate.allowed_paths;
+    task.acceptance = candidate.acceptance;
+    task.risk = candidate.risk;
+    task.verification_mode = candidate.verification_mode;
+    task.acceptance_revision = Number(task.acceptance_revision || 1) + 1;
+    task.evidence_refs = [];
+    task.status = "implementing";
+    task.summary_status = "incomplete";
+    if (input.next_action !== undefined) task.next_action = String(input.next_action);
+    state.authority.scope = task.allowed_paths;
+    state.authority.source_ref = `records/requests/${requestId}.json`;
+  });
+  const updated = await loadProject(project.root);
+  await renderDerived(updated, next);
+  return { ok: true, task: next.task, revision: next.revision, request_ref: stateRef(next.authority.source_ref) };
 }
 
 function stateRef(value) {
@@ -1122,7 +1166,7 @@ async function uninstallPlan(project) {
 async function main(argv) {
   const command = argv[0];
   const { positional, options } = parseArgs(argv.slice(1));
-  if (!command) throw new GuanjiaError("用法：guanjia <init|doctor|status|context|task|checkpoint|resume|handoff|verify|check|hooks install|hooks uninstall|probe|host-event|migrate|uninstall>", EXIT.INPUT);
+  if (!command) throw new GuanjiaError("用法：guanjia <init|doctor|status|context|task start|task revise|task transition|checkpoint|resume|handoff|verify|check|hooks install|hooks uninstall|probe|host-event|migrate|uninstall>", EXIT.INPUT);
   if (command === "init") {
     const project = required(options, "project");
     const result = await install(project, options.name || positional[0], options.host || "generic", Boolean(options["dry-run"]));
@@ -1158,6 +1202,7 @@ async function main(argv) {
   if (command === "migrate" && options.from === "aiops") { const result = await migrateLegacy(project, Boolean(options.apply)); console.log(json(result)); if (!result.ok) process.exitCode = result.status === "conflict" ? EXIT.CONFLICT : EXIT.CAPABILITY; return result; }
   if (command === "uninstall") { const result = await uninstallPlan(project); console.log(json(result)); return result; }
   if (command === "task" && positional[0] === "start") { const input = parseInput(options); const result = await startTask(project, input, input.expected_revision); console.log(json(result)); return result; }
+  if (command === "task" && positional[0] === "revise") { const result = await reviseTask(project, parseInput(options)); console.log(json(result)); return result; }
   if (command === "task" && positional[0] === "transition") { const input = parseInput(options); const result = await transitionTask(project, input); console.log(json(result)); return result; }
   if (command === "verify") { const result = await verify(project, parseInput(options)); console.log(json(result)); if (!result.ok) process.exitCode = EXIT.CHECK; return result; }
   if (command === "check") { const result = await checkStaged(project); console.log(json(result)); if (!result.ok) process.exitCode = EXIT.CHECK; return result; }
