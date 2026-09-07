@@ -693,7 +693,8 @@ async function doctor(project) {
   const probe = await hostProbeStatus(project);
   add("host_hooks", probe.status, `${project.config.host || "generic"}：${probe.message}`, probe);
   if (await exists(join(project.root, ".aiops"))) add("legacy", "warn", "发现旧 .aiops/；本次保留原目录，未自动迁移。");
-  return { ok: checks.every((item) => item.status !== "fail"), project: project.root, project_id: project.config.project_id, revision: project.state.revision, checks };
+  const status = checks.some((item) => item.status === "fail") ? "fail" : checks.every((item) => item.status === "pass") ? "pass" : "needs_action";
+  return { ok: status !== "fail", ready: status === "pass", status, project: project.root, project_id: project.config.project_id, revision: project.state.revision, checks };
 }
 
 function renderDashboard(config, state, snapshot) {
@@ -1192,7 +1193,7 @@ async function main(argv) {
   if (command === "doctor") {
     const result = await doctor(project);
     console.log(json(result));
-    if (!result.ok) process.exitCode = EXIT.CAPABILITY;
+    if (!result.ok || (options.strict && result.status !== "pass")) process.exitCode = EXIT.CAPABILITY;
     return result;
   }
   if (command === "status") {
