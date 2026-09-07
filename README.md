@@ -15,6 +15,14 @@ node guanjia/bin/guanjia.mjs doctor --json
 node guanjia/bin/guanjia.mjs status --json
 ```
 
+Windows PowerShell 可用原生安装入口：
+
+```powershell
+& .\项目模板\scripts\init-project.ps1 "C:\path\to\your-project" "我的项目" generic
+Set-Location "C:\path\to\your-project"
+& .\guanjia\guanjia.ps1 doctor --json
+```
+
 安装后也可以使用项目内的跨平台入口；它们会自动把项目根目录传给核心程序，因此不要求当前目录必须是项目根目录：
 
 ```powershell
