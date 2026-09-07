@@ -1,139 +1,64 @@
-<div align="center">
+# 管家（guanjia）
 
-# aiops-governance-kit
+这是一个轻量的项目管家：把当前任务、授权、暂停状态、交接内容和验证证据落到项目文件里，让编码助手换窗口或换工具后仍能核对现场继续工作。
 
-**给 AI 编码团队用的保障框架：让它们在你不在场时，把活干得基本可靠。**
+它不是新的模型运行时，也不承诺“人格永远在线”。模型负责理解需求和给出摘要；程序负责状态格式、原子写入、状态转换、交接生成、现场核对和证据绑定。
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
+## 先试一次
 
-</div>
-
-## Quick Start
+需要 Node.js 18+（推荐 22+）。在本仓库运行：
 
 ```sh
-# 1. 克隆本仓库
-git clone https://github.com/bystery/aiops-governance-kit.git
-# 2. 一条命令给新项目生成治理骨架（不交互、不覆盖已有内容）
-aiops-governance-kit/项目模板/scripts/init-project.sh ~/my-project 我的项目
-# 3. 打开自动检查 + 下载"需求拷问"方法论（要联网；下载来源固定并校验指纹，
-#    防止装到被篡改的版本。装了它，需求说不清时 AI 会分轮追问你，而不是自己猜）
-cd ~/my-project && git config core.hooksPath .aiops/scripts/hooks
-sh .aiops/scripts/hooks/install-grill-skill.sh
-# 4. 新开一个 AI 会话：把 开启提示词.txt 里的内容原样作为第一条消息发出
-#    （内容就两行：先读主控卡.md、放权机制.md；当前授权模式：默认）
-# 5. 用一句话提第一个需求，例如："给 README 补一个安装小节"
+项目模板/scripts/init-project.sh /path/to/your-project "我的项目" generic
+cd /path/to/your-project
+node guanjia/bin/guanjia.mjs doctor --json
+node guanjia/bin/guanjia.mjs status --json
 ```
 
-## 为什么要做这个
+安装会生成一个可见的 `guanjia/` 资料夹，并把一个带 `GUANJIA BEGIN/END` 标记的短区块合并到根目录 `AGENTS.md`。已有 `AGENTS.md`、业务文件和旧 `.aiops/` 不会被覆盖或删除；发现冲突时会停止并说明原因。
 
-我最开始的愿望很简单：把需求说完，让 AI 自己一轮一轮地干，我去做别的事，干完了它来叫我。
+然后可以这样记录第一个任务：
 
-真跑起来才发现，人一离开，它就开始翻车：前面修好的东西，后面改别处时被悄悄改了回去；它说"已修复"，我一跑根本不是那回事；想退回上一个版本，才发现已经好几天没 commit 了。
-
-这些坑大多是我在开发 LoveBrian（一个自己每天都在用的项目）时踩的。每翻一次车，我就停下来把原因查清楚，补一条规则。攒得多了，就长成了现在这套东西：一套给 AI 编码团队用的章程，外加项目模板和几个自动检查。它不靠叮嘱 AI "下次注意"，靠的是分工和制衡——规划、执行、验收、查证四个角色互相把关。整套东西只有 Markdown 和 shell 脚本，零依赖，不绑定平台，任何能读文件、跑 git 的 AI 编码工具都能直接套用。
-
-> **English abstract:** A documentation-only governance framework that lets a team of AI coding agents (planner / worker / independent checker / researcher) deliver reliably with minimal human supervision. This is not a prompt collection: it ports decades of software-engineering governance — separation of duties, audit trails, least privilege, postmortem culture — to AI teams, in the form of three authoritative rulebooks, a project skeleton template, and mechanical git hooks. Chinese is the working language; the English column in the document map below gives every term's equivalent.
-
-## 两个我印象最深的翻车
-
-- 有一次一个构建命令挂死了 19 分钟，四个 AI 没有一个发现——后来手工重跑同一条命令，34 秒就完事。现在的规矩：每条命令必须带超时，300 秒到点就杀掉并报环境故障。
-- 更离谱的一次：一条很简单的界面需求，经过三级转述（干活的照需求单做、验收的照需求单验、汇报的照需求单说），最后被做成和我原话完全相反的行为——三级里没有一级回头对过我的原话。现在的规矩：每条需求的原话逐字记进账本，交付只对转述后的描述负责，"转述得忠不忠实"本身也列入验收清单。
-
-这套规则不是拍脑袋设计的。我把两轮真实实战的会话逐轮审计，数出 19 条机制缺陷、10 条执行失误，全部转成了可执行的条文；25 起历史事故编号入账，其中 22 起做了回放验证——逐条检查"现在的规则能不能拦住当初那次翻车"，全部通过。方法摆在[证据附录](docs/EVIDENCE.md)里，你可以自己判断它算不算硬。
-
-## 这套东西长什么样
-
-一个主控 AI 带四个干活的 AI。主控是唯一和我说话的；四个角色分工固定、互不直连，只通过文件和 git 交流：
-
-![项目治理总览：人、主控、四角色、磁盘通信](docs/overview.jpeg)
-
-```
-                ┌───────────────────────────────┐
-                │          项目所有者（人类）           │
-                │   只做：拍板 / 亲手验收 / 授予放权 │
-                └───────────────┬───────────────┘
-              白话四段式汇报 ↑    │    ↓ 只能你拍板的事
-                ┌───────────────▼───────────────┐
-                │       主控（唯一调度枢纽）        │
-                │   不写大需求功能代码，不当验收人    │
-                └──┬──────────┬──────────┬──────┘
-             计划单↓      任务单↓      验收转交↓     调研单↓
-           ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌────────────┐
-           │ planner │ │ worker  │ │ checker │ │ researcher │
-           │ 只出计划  │ │ 只执行   │ │ 只验收   │ │ 只查事实   │
-           └────┬────┘ └────┬────┘ └────┬────┘ └──────┬─────┘
- ═══════════════╧═══════════╧═══════════╧═════════════╧═════════════
-          磁盘 + git = 唯一通信介质（四角色互不直连、只认磁盘）
- ─────────────────────────────────────────────────────────────────
- 闭环：规划 → 执行 → 独立验收 → 打包提交（代码+验收结论+进度+决策记录）
-      → 记录教训 → 修正 → 再执行
-
- 自动检查（git hooks，可选但强烈建议）：
-   提交前检查 = 没有验收记录不许提交；文件放哪、放多少也管
-   提交信息检查 = 进度文件被大幅删除时必须带说明
-   手动检查 ×4 = 需求引用唯一性 / 单会话批次数上限 / 常读文档大小上限 / 需求拷问方法论已安装
+```sh
+node guanjia/bin/guanjia.mjs task start --input '{"goal":"修复登录失败提示","allowed_paths":["src/auth/**","tests/auth/**"],"acceptance":["错误凭据显示明确提示"],"reuse":[{"path":"src/auth/errors.ts","decision":"extend","reason":"已有错误映射入口"}]}'
+node guanjia/bin/guanjia.mjs checkpoint --input '{"summary":"已定位登录错误映射入口","next_action":"补充错误凭据行为测试"}'
+node guanjia/bin/guanjia.mjs handoff
 ```
 
-几条硬规矩：
+新窗口不需要再次粘贴长开启提示词。先读取 `guanjia/START.md`，再运行 `resume --json`；如果用户明确暂停，恢复命令只汇报，不会自动启动写任务。
 
-- 干活的 AI 说"做完了"不算数，验收的 AI 自己重跑一遍、全过才算；
-- 每个角色只读到自己那份提示词，看不到其他角色的条文；
-- 每次 git 提交都被自动检查拦一道，没有验收记录不许提交；
-- 不是所有活都走全流程：改一个文件的小活主控自己干，中等活一张任务单，大需求才开全流程；
-- 花钱、动隐私、删数据、对外发布、改需求——这五件事 AI 只能出选择题，永远不能替我决定。
+## 当前已经实现的能力
 
-## 五条第一眼像在添麻烦的设计
+- 跨平台安装：字面处理中文、空格、`A/B`、`R&D` 等项目名；安装可重复执行；原有 `AGENTS.md` 受管区块之外的内容保留。
+- 结构化状态：`state.json` 带 schema、revision、任务范围、授权、暂停、会话和现场信息；状态写入有锁、备份和原子替换。
+- 交接恢复：`checkpoint`、`handoff`、`resume` 生成可读 `HANDOFF.md` 和状态面板；交接摘要缺失时明确标为“不完整”。
+- 任务契约：开始任务必须登记范围、完成标准和复用判断；状态转换不能用任意字段直接绕过。
+- 证据门槛：验证记录保存实际 argv、退出码、超时、输出摘要和快照摘要；失败、超时、过期或未执行都不能登记为完成。
+- 基础提交检查：`check --scope staged --json` 会检查业务改动是否有任务、是否越界、是否有绑定当前暂存快照的 PASS 证据。
 
-1. **磁盘不认汇报。** 验收角色只信自己重跑的结果；干活的 AI 说"我做完了"不算数，它粘贴的历史输出只算线索、不算证据。
-2. **有五件事永远留给人。** 花钱、动隐私、删不可恢复的数据、对外公开发布、需求变更——无论授权开到多高，AI 都只能把选择题端上来，不能代决。
-3. **原话逐字入账。** 每条需求五行登记：原话逐字粘贴 / 批注 / 转述 / 确认 / 交付回链。交付只对转述负责，治的就是"转述变味"。
-4. **规则只许越改越瘦。** 每次修订规则文档，新增的条数不能超过删掉的条数，超了打回重写——文档不许单向变胖。（五条里我最没把握的就是这条：它可能误伤正当的扩写，这条我自己也没完全想清楚。）
-5. **小活不走全流程。** 单文件小修主控亲自做直接提交，中型需求一张任务单，只有大需求才开全流程。流程本身是成本，能省则省。
+## 尚未宣称完成的部分
 
-## 诚实的边界
+ZCode/Codex 的真实生命周期 hook、插件信任/启用、跨宿主自动注入、Windows 原生和 macOS Finder 解压实测仍是独立验证项。`doctor` 会把这些显示为 `unverified` 或降级，而不会把生成文件冒充自动接入。
 
-- 单文件小改不值得用这套。我自己也不会为改一行字开四个角色。小活不走全流程能缓解开销，消除不了；
-- 文档是真实成本。规则要读、要维护、要收敛；文档大小上限和"只许越改越瘦"是止血带，不是免费午餐；
-- 验收独立性有天花板。理想配置是不同厂商的模型；做不到时降级为"同厂不同型号 + 机械检查占比过半"，独立性打折；框架会要求如实登记，而不是假装异源；
-- 它假设你愿意当"放权的委托人"，不是甩手掌柜。每周翻一遍 AI 替你拿过的主意的记录、保留事后否决权，这些动作没人能替你做。
+旧 `.aiops/` 资料会被保留。本轮没有自动迁移、删除或改写旧历史；迁移器应在后续阶段提供 dry-run、冲突清单和可回退切换。
 
-## 文档地图
+## 目录约定
 
-| 文件 | 内容 | English |
-|---|---|---|
-| `主控卡.md` | 调度总入口：会话入口、需求分级、汇报协议 | Coordinator Card |
-| `docs/EVIDENCE.md` | 证据附录：事故 → 根因缺陷 → 拦截条文对照（精选节选） | Evidence Appendix |
-| `放权机制.md` | 授权三档与各环节把关人映射（唯一事实源） | Authority & Delegation |
-| `智能体角色定义.md` | 四角色定义 + 投影生成规程 | Agent Role Definitions |
-| `项目模板/说明-如何使用本项目模板.md` | 模板包使用说明 | Template Usage Guide |
-| `项目模板/AGENTS.md.template` | 目标项目根目录的指针文件模板 | Repo Pointer Template |
-| `项目模板/.aiops/` | 治理文档骨架（进度/待办/决策/读集等模板） | Governance Skeleton Templates |
-| `项目模板/.aiops/scripts/hooks/` | 自动检查脚本（git hooks） | Mechanical Gate Hooks |
-| `项目模板/scripts/init-project.sh` | 一键生成 `.aiops/` 骨架 | Project Initializer |
-| `grill-me/` `grilling/` | 需求拷问技能（来自 mattpocock/skills，见目录内 README） | Grilling Skills |
-| `开启提示词.txt` | 每次开新会话发给 AI 的开场白 | Session Opener |
+| 路径 | 作用 |
+|---|---|
+| `guanjia/state.json` | 动态状态唯一权威 |
+| `guanjia/HANDOFF.md` | 自动生成的可读交接快照 |
+| `guanjia/README.md` | 从状态派生的状态面板 |
+| `guanjia/rules/` | 短规则，按需读取；包含 DRY、测试和责任边界 |
+| `guanjia/records/requests/` | 需求原话及任务契约引用 |
+| `guanjia/records/evidence/` | 不可替代的验证记录 |
+| `guanjia/runtime/` | 锁、备份等本地运行数据，默认不提交 |
 
-## FAQ
+## 设计原则
 
-**Q：这和"给 AI 的 prompt 合集"有什么区别？**
-prompt 合集给你台词，这套给你制度：四个角色互相制衡、验收只认磁盘、每次提交强制携带验收结论；规则之间有权重排序和冲突处理条款，不是一堆平行叮嘱。
+抽象与建模、模块化与信息隐藏、复用、分阶段确认与验证、风险管理与留痕、可度量与持续改进，均通过任务字段、状态转换、交接和验证记录进入执行链。技术责任落到代码/测试证据，协作责任落到接口/交接，判断责任落到评审结论和未知项；不以增加几篇口号文档代替机制。
 
-**Q：需要什么环境？**
-任意能读文件、跑 git 的 AI 编码工具（CLI 或 IDE 内置 agent 均可）。检查脚本是纯 POSIX shell + git 原生命令，无第三方依赖。
-
-**Q：文档全是中文，非中文用户能用吗？**
-能。上方文档地图给全英文对应；条文本身建议用你团队的工作语言维护。
-
-**Q：会把小任务搞得很重吗？**
-不会。小活不走全流程就是为此设计的：小修直提、中型一张任务单，只有大需求才进全流程。不过要是连一张任务单都嫌麻烦，那这活多半本来就用不上这套。
-
-**Q：可以不装自动检查吗？**
-可以，规程和检查是分开的。但不装的话，"AI 说做完了没人验证"就只能靠自觉——那正是本框架要治的第一号病。
-
-## 最后
-
-这套东西还在从日常使用里继续长，写给和我一样"提需求、等交付、翻车、再许愿"的同学。clone 下来，把 开启提示词.txt 的内容发给 AI，五分钟量级就能在真实项目里试第一单。翻车了，或者发现某条规则在你的场景走不通，欢迎开 issue——它本来就是从事故里长出来的，你的案例是最好的原料。
+详细实施状态见 `docs/implementation-status.md`，宿主兼容边界见 `docs/compatibility.md`。
 
 ## License
 
