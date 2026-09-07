@@ -1,0 +1,6 @@
+{
+  "name": "guanjia",
+  "version": "0.1.0",
+  "description": "读取当前项目的管家状态并注入短恢复上下文",
+  "license": "MIT"
+}
