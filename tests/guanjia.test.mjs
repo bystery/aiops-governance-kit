@@ -86,6 +86,21 @@ test("安装保留原 AGENTS，特殊字符项目名不破坏资料，重复安�
   }
 });
 
+test("安装预检失败不会留下半套资料", async () => {
+  const project = await mkdtemp(join(tmpdir(), "guanjia-install-preflight-"));
+  try {
+    await mkdir(join(project, "guanjia"));
+    await writeFile(join(project, "guanjia", "config.json"), JSON.stringify({ schema_version: 1, project_id: "preflight-project", project_name: "预检", host: "generic", package_version: "0.1.0", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), validation: { commands: [] }, capabilities: { core: "verified", host_hooks: "unverified", submit_gate: "not_configured" } }), "utf8");
+    await writeFile(join(project, "AGENTS.md"), "<!-- GUANJIA BEGIN -->\n缺少结束标记\n", "utf8");
+    const result = await run("sh", [INSTALLER, project, "预检失败", "generic"], project, 4);
+    assert.match(result.stderr, /受管区块不完整/);
+    assert.equal(await exists(join(project, "guanjia", "state.json")), false);
+    assert.equal(await exists(join(project, "guanjia", "bin", "guanjia.mjs")), false);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
 test("交接、用户暂停和新会话恢复可观察且不会自动解除暂停", async () => {
   const project = await mkdtemp(join(tmpdir(), "guanjia-handoff-"));
   try {
