@@ -5,6 +5,7 @@
 ## 常用动作
 
 - 查看现状：node guanjia/bin/guanjia.mjs status --json
+- 严格诊断：node guanjia/bin/guanjia.mjs doctor --strict --json（存在 warning/unverified 时返回非零）
 - 恢复任务：node guanjia/bin/guanjia.mjs resume --json（若 HANDOFF 过期或现场变化，会先进入 needs_review）
 - 暂停/交接：node guanjia/bin/guanjia.mjs handoff
 - 继续工作：先读取本文件、guanjia/state.json 和生成的 guanjia/HANDOFF.md。
