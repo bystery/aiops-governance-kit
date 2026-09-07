@@ -340,14 +340,21 @@ async function mergeAgents(root) {
 }
 
 const STATIC_RESOURCE_PATHS = [
+  "bin/guanjia.mjs",
   "START.md",
   "rules/core.md",
   "rules/worker.md",
   "templates/HANDOFF.md",
   "adapters/README.md",
+  "adapters/generic/hooks.json",
   "adapters/zcode/hooks.json",
   "adapters/codex/hooks.json",
+  "adapters/qoder/hooks.json",
+  "adapters/workbuddy/hooks.json",
   "hooks/README.md",
+  "guanjia.ps1",
+  "guanjia.cmd",
+  "guanjia.sh",
   "runtime/.gitignore",
   "records/requests/.gitkeep",
   "records/evidence/.gitkeep",

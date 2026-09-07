@@ -1,0 +1,11 @@
+{
+  "host": "workbuddy",
+  "version": "unverified",
+  "status": "unverified",
+  "events": ["session_start", "user_prompt", "tool_after", "stop"],
+  "transport": "workbuddy-version-specific-hook",
+  "notes": [
+    "需要确认桌面个人版或企业版以及配置作用域。",
+    "CodeBuddy CLI 的资料不能直接证明 WorkBuddy 桌面版已接入。"
+  ]
+}

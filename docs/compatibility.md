@@ -7,8 +7,10 @@
 | Generic/manual | 已实现 | 可在任意能运行 Node.js 的项目中手动调用 init、status、checkpoint、handoff、resume、verify、check |
 | ZCode | 契约已提供，真实接入未验证 | `guanjia/adapters/zcode/hooks.json` 描述事件；用 `probe`/`host-event` 记录真实 nonce 回执；项目文件不等于用户级插件注册 |
 | Codex | 契约已提供，真实接入未验证 | `guanjia/adapters/codex/hooks.json` 描述事件；需要宿主信任/启用后的真实 SessionStart、用户输入和压缩恢复回执 |
-| Qoder IDE | 未验证 | IDE 事件和 CLI 不应混用；后续单独适配 |
-| WorkBuddy | 未验证 | 需要确认具体桌面版/企业版和配置作用域 |
+| Qoder IDE | 契约已提供，真实接入未验证 | `guanjia/adapters/qoder/hooks.json` 只描述候选事件；IDE 事件和 CLI 不应混用，需要按实际发行版做探针 |
+| WorkBuddy | 契约已提供，真实接入未验证 | `guanjia/adapters/workbuddy/hooks.json` 只描述候选事件；需要确认具体桌面版/企业版和配置作用域 |
+
+项目内同时提供 `guanjia.ps1`、`guanjia.cmd` 和 `guanjia.sh` 薄包装器。包装器只负责定位项目根目录和转发参数，不代表对应宿主已经加载适配器。
 
 ## `doctor` 的解释
 

@@ -46,7 +46,15 @@ test("安装保留原 AGENTS，特殊字符项目名不破坏资料，重复安�
     assert.match(agents, /用户原有规则/);
     assert.match(agents, /GUANJIA BEGIN/);
     assert.equal(await readFile(join(project, ".aiops", "legacy.txt"), "utf8"), "legacy");
+    assert.match(await readFile(join(project, "guanjia", "bin", "guanjia.mjs"), "utf8"), /const STATIC_RESOURCE_PATHS/);
     assert.match(await readFile(join(project, "guanjia", "START.md"), "utf8"), /管家入口/);
+    assert.match(await readFile(join(project, "guanjia", "guanjia.ps1"), "utf8"), /PSScriptRoot/);
+    assert.match(await readFile(join(project, "guanjia", "guanjia.cmd"), "utf8"), /PROJECT_ROOT/);
+    assert.match(await readFile(join(project, "guanjia", "guanjia.sh"), "utf8"), /PROJECT_ROOT/);
+    const fromOutside = await run("sh", [join(project, "guanjia", "guanjia.sh"), "status", "--json"], tmpdir());
+    const outsideStatus = JSON.parse(fromOutside.stdout);
+    assert.equal(outsideStatus.project_id.length > 0, true);
+    assert.equal(outsideStatus.project, project);
     const second = await run("sh", [INSTALLER, project, "A/B & R&D", "generic"], project);
     assert.equal(second.stdout.includes("管家已接入"), true);
     const repeated = await readFile(join(project, "AGENTS.md"), "utf8");

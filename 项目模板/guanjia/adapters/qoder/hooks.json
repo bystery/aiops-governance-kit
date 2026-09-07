@@ -1,0 +1,11 @@
+{
+  "host": "qoder",
+  "version": "unverified",
+  "status": "unverified",
+  "events": ["session_start", "user_prompt", "tool_after", "stop"],
+  "transport": "qoder-ide-or-cli-hook",
+  "notes": [
+    "IDE 和 CLI 事件不能互相冒充；需要按实际发行版做探针。",
+    "配置文件存在不代表 Qoder 已加载。"
+  ]
+}
