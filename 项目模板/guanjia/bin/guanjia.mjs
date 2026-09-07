@@ -26,6 +26,7 @@ const META_PATHS = [
   "guanjia/HANDOFF.md",
   "guanjia/records/evidence/",
   "guanjia/records/requests/",
+  "guanjia/records/events/",
 ];
 
 const EXIT = {
@@ -288,6 +289,41 @@ async function mutateState(project, expectedRevision, mutation) {
   } finally {
     await release().catch(() => {});
   }
+}
+
+function bounded(value, limit = 256) {
+  return value === undefined || value === null ? null : String(value).slice(0, limit);
+}
+
+async function recordContextEvent(project, input) {
+  const eventId = `EV-${Date.now()}-${randomUUID().slice(0, 8)}`;
+  const event = bounded(input.event || "manual", 80);
+  const host = bounded(input.host || project.config.host || "generic", 80);
+  const sessionId = bounded(input.session_id, 256);
+  const record = {
+    schema_version: 1,
+    event_id: eventId,
+    project_id: project.config.project_id,
+    host,
+    event,
+    session_id: sessionId,
+    source: bounded(input.source || "host-adapter", 80),
+    recorded_at: now(),
+  };
+  await writeJsonAtomic(join(project.guanjia, "records", "events", `${eventId}.json`), record);
+
+  let next = project.state;
+  const sessionChanged = sessionId && (project.state.session.host_session_id !== sessionId || project.state.session.host !== host);
+  if (sessionChanged) {
+    next = await mutateState(project, undefined, (state) => {
+      state.session.host = host;
+      state.session.host_session_id = sessionId;
+      state.session.active = true;
+    });
+    const updated = await loadProject(project.root);
+    await renderDerived(updated, next);
+  }
+  return { event_id: eventId, revision: next.revision, session_id: sessionId };
 }
 
 function initialState(config, snapshot) {
@@ -974,7 +1010,9 @@ async function main(argv) {
     return result;
   }
   if (command === "context") {
-    const result = { ok: true, event: options.event || "manual", session_id: options.session || null, project_id: project.config.project_id, revision: project.state.revision, task: project.state.task ? { id: project.state.task.id, status: project.state.task.status, goal: project.state.task.goal, allowed_paths: project.state.task.allowed_paths, acceptance: project.state.task.acceptance, next_action: project.state.task.next_action, evidence_refs: project.state.task.evidence_refs } : null, authority: project.state.authority, workspace: await workspaceSnapshot(project.root), instructions: project.state.authority.paused_by_user ? "用户已暂停：只汇报，不执行写任务。" : "先核对现场，再按当前任务范围工作。" };
+    const recordedEvent = options["record-event"] ? await recordContextEvent(project, { event: options.event || "manual", session_id: options.session || null, host: options.host || project.config.host, source: options.source || "context" }) : null;
+    const current = recordedEvent ? await loadProject(project.root) : project;
+    const result = { ok: true, event: options.event || "manual", session_id: options.session || null, ...(recordedEvent ? { recorded_event: recordedEvent } : {}), project_id: current.config.project_id, revision: current.state.revision, task: current.state.task ? { id: current.state.task.id, status: current.state.task.status, goal: current.state.task.goal, allowed_paths: current.state.task.allowed_paths, acceptance: current.state.task.acceptance, next_action: current.state.task.next_action, evidence_refs: current.state.task.evidence_refs } : null, authority: current.state.authority, workspace: await workspaceSnapshot(current.root), instructions: current.state.authority.paused_by_user ? "用户已暂停：只汇报，不执行写任务。" : "先核对现场，再按当前任务范围工作。" };
     console.log(json(result));
     return result;
   }

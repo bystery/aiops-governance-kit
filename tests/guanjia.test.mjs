@@ -204,7 +204,7 @@ test("ZCode/Codex 薄适配器只注入当前项目短上下文，未接入项�
     await run("sh", [INSTALLER, project, "适配器测试", "zcode"], project);
     const zcodeHook = join(project, "guanjia", "adapters", "zcode-marketplace", "plugins", "guanjia", "hooks", "guanjia-hook.mjs");
     const codexHook = join(project, "guanjia", "adapters", "codex", "hook.mjs");
-    const zcode = await runHook(zcodeHook, project, { cwd: project, hook_event_name: "SessionStart", session_id: "zcode-session-1" });
+    const zcode = await runHook(zcodeHook, project, { cwd: project, hook_event_name: "SessionStart", session_id: "zcode-session-1", prompt: "do-not-persist-this" });
     assert.equal(zcode.code, 0);
     const zcodePayload = JSON.parse(zcode.stdout);
     assert.equal(zcodePayload.hookSpecificOutput.hookEventName, "SessionStart");
@@ -212,6 +212,14 @@ test("ZCode/Codex 薄适配器只注入当前项目短上下文，未接入项�
     const codex = await runHook(codexHook, project, { cwd: project, hook_event_name: "SessionStart", session_id: "codex-session-1" });
     assert.equal(codex.code, 0);
     assert.match(JSON.parse(codex.stdout).hookSpecificOutput.additionalContext, /管家恢复上下文/);
+    const events = (await readdir(join(project, "guanjia", "records", "events"))).filter((name) => name.endsWith(".json"));
+    assert.equal(events.length, 2);
+    const firstEvent = JSON.parse(await readFile(join(project, "guanjia", "records", "events", events[0]), "utf8"));
+    assert.equal(firstEvent.prompt, undefined);
+    assert.equal(firstEvent.session_id, "zcode-session-1");
+    const state = JSON.parse(await readFile(join(project, "guanjia", "state.json"), "utf8"));
+    assert.equal(state.session.host, "codex");
+    assert.equal(state.session.host_session_id, "codex-session-1");
     const foreign = await mkdtemp(join(tmpdir(), "guanjia-foreign-"));
     try {
       const before = await readFile(join(project, "guanjia", "state.json"), "utf8");
