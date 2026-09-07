@@ -63,7 +63,7 @@ node guanjia/bin/guanjia.mjs handoff
 - 旧项目迁移：`migrate --from aiops` 默认只生成清单；显式 `--apply` 才复制历史资料，源 `.aiops/` 保留，重复迁移会报告冲突。
 - 卸载诊断：`uninstall --dry-run` 只列出受管文件、入口区块和 hook，不删除状态、证据或用户修改。
 - 跨平台入口：提供 PowerShell、CMD 和 POSIX shell 薄包装器；核心逻辑仍只有一份，并显式固定 `--project`。
-- 宿主适配契约：补齐 generic、Qoder、WorkBuddy 的事件契约；未收到真实 nonce 回执的宿主仍保持 `unverified`。
+- 宿主适配契约：补齐 generic、Qoder、WorkBuddy 的事件契约；接入事件只记录精简诊断信息，不保存原始 prompt；未收到真实 nonce 回执的宿主仍保持 `unverified`。
 
 ## 尚未宣称完成的部分
 

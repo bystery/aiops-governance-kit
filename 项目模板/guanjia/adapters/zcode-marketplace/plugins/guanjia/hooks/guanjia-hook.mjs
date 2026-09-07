@@ -23,7 +23,7 @@ async function readInput() {
 function runCore(root, input) {
   return new Promise((done) => {
     const core = join(root, "guanjia", "bin", "guanjia.mjs");
-    const child = spawn(process.env.NODE || "node", [core, "context", "--project", root, "--event", input.hook_event_name || "manual", "--session", input.session_id || "", "--json"], { cwd: root, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    const child = spawn(process.env.NODE || "node", [core, "context", "--project", root, "--event", input.hook_event_name || "manual", "--session", input.session_id || "", "--host", "zcode", "--record-event", "--json"], { cwd: root, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
