@@ -430,6 +430,19 @@ async function install(projectDir, name, host, dryRun) {
     validation: { commands: [] },
     capabilities: { core: "verified", host_hooks: "unverified", submit_gate: "not_configured" },
   };
+  const resources = await staticResources();
+  const agentsPath = join(root, "AGENTS.md");
+  const existingAgents = await exists(agentsPath) ? await readText(agentsPath) : "";
+  if (existingAgents.includes(MANAGED_BEGIN) !== existingAgents.includes(MANAGED_END)) {
+    throw new GuanjiaError("AGENTS.md 的管家受管区块不完整，拒绝在预检未通过时写入安装资料。", EXIT.CONFLICT);
+  }
+  for (const [relativePath, content] of resources) {
+    const target = join(guanjia, relativePath);
+    if (await exists(target) && await readText(target) !== content) {
+      throw new GuanjiaError(`受管文件已被修改，拒绝覆盖：${target}`, EXIT.CONFLICT);
+    }
+  }
+  if (await exists(join(guanjia, "state.json"))) await readJson(join(guanjia, "state.json"), "guanjia/state.json");
   const plan = {
     project: root,
     project_name: config.project_name,
@@ -444,9 +457,9 @@ async function install(projectDir, name, host, dryRun) {
 
   await fs.mkdir(guanjia, { recursive: true });
   await fs.mkdir(join(guanjia, "runtime", "backups"), { recursive: true });
-  await writeJsonAtomic(configPath, config);
+  if (!hasConfig) await writeJsonAtomic(configPath, config);
   if (!(await exists(join(guanjia, "state.json")))) await writeJsonAtomic(join(guanjia, "state.json"), initialState(config, snapshot));
-  for (const [relativePath, content] of await staticResources()) {
+  for (const [relativePath, content] of resources) {
     const target = join(guanjia, relativePath);
     if (await exists(target)) {
       const current = await readText(target);
@@ -459,7 +472,7 @@ async function install(projectDir, name, host, dryRun) {
   await renderDerived(project, project.state);
   await mergeAgents(root);
   const managed = [];
-  for (const [relativePath] of await staticResources()) managed.push(`guanjia/${relativePath}`);
+  for (const [relativePath] of resources) managed.push(`guanjia/${relativePath}`);
   const manifest = { schema_version: 1, package_version: config.package_version, generated_at: now(), files: {} };
   for (const path of managed) manifest.files[path] = await sha256File(join(root, path));
   await writeJsonAtomic(join(guanjia, "manifest.json"), manifest);
