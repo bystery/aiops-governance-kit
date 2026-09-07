@@ -61,7 +61,7 @@ node guanjia/bin/guanjia.mjs handoff
 - 宿主探针：`probe` / `host-event` 用唯一 nonce 记录真实事件回执；配置文件和模拟 JSON 不会被当成宿主已接入。
 - 宿主薄适配：提供可审查的 ZCode 本地 marketplace、Codex 项目 hooks 模板及 Node 桥接脚本；未完成宿主安装/信任和真实回执前保持 `unverified`。
 - 旧项目迁移：`migrate --from aiops` 默认只生成清单；显式 `--apply` 才复制历史资料，源 `.aiops/` 保留，重复迁移会报告冲突。
-- 卸载诊断：`uninstall --dry-run` 只列出受管文件、入口区块和 hook，不删除状态、证据或用户修改。
+- 卸载诊断与回退：`uninstall --dry-run` 只列出受管文件、入口区块和 hook；`hooks uninstall` 仅在 wrapper 未被用户修改时恢复原 `pre-commit`，不删除状态、证据或用户修改。
 - 跨平台入口：提供 PowerShell、CMD 和 POSIX shell 薄包装器；核心逻辑仍只有一份，并显式固定 `--project`。
 - 宿主适配契约：补齐 generic、Qoder、WorkBuddy 的事件契约；接入事件只记录精简诊断信息，不保存原始 prompt；未收到真实 nonce 回执的宿主仍保持 `unverified`。
 

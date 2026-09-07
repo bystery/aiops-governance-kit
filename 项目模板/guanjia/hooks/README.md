@@ -8,3 +8,5 @@
 4. 不修改已有 `core.hooksPath` 配置。
 
 如果已有 hooks 管理器会自动重写文件，doctor 只显示“未知/未验证”，不能把一次安装当作长期生效。管家 hook 不运行模型、不自动 add、不自动修改证据，也不递归提交。
+
+如需回退，运行 `node guanjia/bin/guanjia.mjs hooks uninstall`。只有当前文件仍是管家 wrapper 时才会恢复原 hook；用户手工改过 wrapper 会返回冲突并保留现状。

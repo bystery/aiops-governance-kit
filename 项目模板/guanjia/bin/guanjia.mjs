@@ -547,6 +547,29 @@ async function installHooks(project) {
   return { ok: true, status: "installed", hooks_dir: details.hooks_dir, pre_commit: details.pre_commit, preserved_existing_hook: preserved, existing_hooks_path: details.configured };
 }
 
+async function uninstallHooks(project) {
+  const details = await hookDetails(project.root);
+  if (!details.available) return { ok: true, status: "not_installed", reason: "当前目录不是 Git 仓库" };
+  if (!details.exists) return { ok: true, status: "not_installed", hooks_dir: details.hooks_dir, pre_commit: details.pre_commit };
+  if (!details.managed) throw new GuanjiaError("当前 pre-commit 不是管家生成的 wrapper，拒绝覆盖或删除。", EXIT.CONFLICT);
+  if (await readText(details.pre_commit) !== hookWrapper()) throw new GuanjiaError("管家 wrapper 已被用户修改，拒绝覆盖或删除，请人工合并。", EXIT.CONFLICT);
+
+  const original = join(details.hooks_dir, "pre-commit.guanjia-original");
+  if (await exists(original)) {
+    const stat = await fs.stat(original);
+    await fs.copyFile(original, details.pre_commit);
+    await fs.chmod(details.pre_commit, stat.mode & 0o777);
+    await fs.rm(original, { force: true });
+  } else {
+    await fs.rm(details.pre_commit, { force: true });
+  }
+  const config = structuredClone(project.config);
+  config.updated_at = now();
+  config.capabilities = { ...(config.capabilities || {}), submit_gate: "not_configured" };
+  await writeJsonAtomic(project.configPath, config);
+  return { ok: true, status: "uninstalled", hooks_dir: details.hooks_dir, pre_commit: details.pre_commit, restored_existing_hook: await exists(details.pre_commit) };
+}
+
 async function adapterManifest(project, host) {
   const path = join(project.guanjia, "adapters", host, "hooks.json");
   if (await exists(path)) return readJson(path, `guanjia/adapters/${host}/hooks.json`);
@@ -1031,7 +1054,7 @@ async function uninstallPlan(project) {
 async function main(argv) {
   const command = argv[0];
   const { positional, options } = parseArgs(argv.slice(1));
-  if (!command) throw new GuanjiaError("用法：guanjia <init|doctor|status|context|task|checkpoint|resume|handoff|verify|check|hooks|probe|host-event|migrate|uninstall>", EXIT.INPUT);
+  if (!command) throw new GuanjiaError("用法：guanjia <init|doctor|status|context|task|checkpoint|resume|handoff|verify|check|hooks install|hooks uninstall|probe|host-event|migrate|uninstall>", EXIT.INPUT);
   if (command === "init") {
     const project = required(options, "project");
     const result = await install(project, options.name || positional[0], options.host || "generic", Boolean(options["dry-run"]));
@@ -1061,6 +1084,7 @@ async function main(argv) {
   if (command === "checkpoint") { const result = await checkpoint(project, options.input ? parseInput(options) : {}); console.log(json(result)); return result; }
   if (command === "handoff") { const result = await checkpoint(project, options.input ? parseInput(options) : {}, true); console.log(json(result)); return result; }
   if (command === "hooks" && positional[0] === "install") { const result = await installHooks(project); console.log(json(result)); return result; }
+  if (command === "hooks" && positional[0] === "uninstall") { const result = await uninstallHooks(project); console.log(json(result)); return result; }
   if (command === "probe") { const result = await probeHost(project, options.host || project.config.host || "generic", options.nonce); console.log(json(result)); return result; }
   if (command === "host-event") { const result = await hostEvent(project, parseInput(options)); console.log(json(result)); return result; }
   if (command === "migrate" && options.from === "aiops") { const result = await migrateLegacy(project, Boolean(options.apply)); console.log(json(result)); if (!result.ok) process.exitCode = result.status === "conflict" ? EXIT.CONFLICT : EXIT.CAPABILITY; return result; }
