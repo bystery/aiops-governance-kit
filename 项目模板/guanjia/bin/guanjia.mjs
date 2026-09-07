@@ -589,7 +589,11 @@ async function hostEvent(project, input) {
   const expectedPath = join(project.guanjia, "runtime", "probes", `${nonce}.json`);
   if (!(await exists(expectedPath))) throw new GuanjiaError(`没有找到 nonce=${nonce} 的待验证探针。`, EXIT.CONFLICT);
   const expected = await readJson(expectedPath, "探针预期");
-  const receipt = { schema_version: 1, nonce, host: input.host || expected.host, event: required(input, "event"), session_id: input.session_id || null, received_at: now(), source: input.source || "host-adapter", status: "received" };
+  const host = input.host || expected.host;
+  const event = required(input, "event");
+  if (host !== expected.host) throw new GuanjiaError(`探针 host 不匹配：需要 ${expected.host}，收到 ${host}。`, EXIT.CONFLICT);
+  if (Array.isArray(expected.expected_events) && expected.expected_events.length && !expected.expected_events.includes(event)) throw new GuanjiaError(`探针事件不在宿主契约中：${event}。`, EXIT.CONFLICT);
+  const receipt = { schema_version: 1, nonce, host, event, session_id: input.session_id || null, received_at: now(), source: input.source || "host-adapter", status: "received" };
   await writeJsonAtomic(join(project.guanjia, "runtime", "probes", `${nonce}.receipt.json`), receipt);
   return { ok: true, status: "received", nonce, event: receipt.event, session_id: receipt.session_id };
 }
@@ -600,12 +604,24 @@ async function hostProbeStatus(project) {
   const names = await fs.readdir(dir);
   const pending = [];
   const received = [];
+  const invalid = [];
   for (const name of names.filter((item) => item.endsWith(".json") && !item.endsWith(".receipt.json"))) {
     const nonce = name.slice(0, -5);
-    if (await exists(join(dir, `${nonce}.receipt.json`))) received.push(nonce);
-    else pending.push(nonce);
+    if (!(await exists(join(dir, `${nonce}.receipt.json`)))) {
+      pending.push(nonce);
+      continue;
+    }
+    try {
+      const expected = await readJson(join(dir, name), "探针预期");
+      const receipt = await readJson(join(dir, `${nonce}.receipt.json`), "探针回执");
+      const valid = receipt.schema_version === 1 && receipt.status === "received" && receipt.nonce === nonce && receipt.host === expected.host && (!expected.expected_events?.length || expected.expected_events.includes(receipt.event));
+      if (valid) received.push(nonce); else invalid.push(nonce);
+    } catch {
+      invalid.push(nonce);
+    }
   }
-  if (received.length) return { status: "pass", message: "已收到至少一条真实探针回执", received, pending };
+  if (received.length) return { status: "pass", message: "已收到至少一条符合契约的真实探针回执", received, pending, invalid };
+  if (invalid.length) return { status: "fail", message: "探针回执存在但不符合 nonce/host/event 契约", invalid, pending };
   return { status: "unverified", message: pending.length ? "探针已发出但尚未收到真实宿主回执" : "尚未运行宿主探针", pending };
 }
 
