@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, mkdir, rm, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -101,6 +101,47 @@ test("暂存业务改动没有证据不能放行，验证证据必须绑定暂�
     assert.equal(after.result, "PASS");
     const completed = await cli(project, ["task", "transition", "--input", JSON.stringify({ task_id: started.task.id, status: "completed", evidence_refs: [verified.evidence.evidence_id], expected_revision: verified.revision }), "--json"]);
     assert.equal(completed.task.status, "completed");
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("提交检查接入会保留原 hook，不把配置存在冒充生效", async () => {
+  const project = await mkdtemp(join(tmpdir(), "guanjia-hooks-"));
+  try {
+    await gitInit(project);
+    await writeFile(join(project, "README.md"), "fixture\n", "utf8");
+    await run("git", ["add", "README.md"], project);
+    await run("git", ["commit", "-qm", "fixture"], project);
+    await run("sh", [INSTALLER, project, "hook 测试", "generic"], project);
+    await run("git", ["add", "guanjia", "AGENTS.md"], project);
+    await run("git", ["commit", "-qm", "install guanjia"], project);
+    const hooksDir = join(project, ".git", "hooks");
+    const original = join(hooksDir, "pre-commit");
+    await writeFile(original, "#!/bin/sh\necho ORIGINAL-HOOK\n", "utf8");
+    await chmod(original, 0o755);
+    const installed = await cli(project, ["hooks", "install", "--json"]);
+    assert.equal(installed.status, "installed");
+    assert.equal(await readFile(join(hooksDir, "pre-commit.guanjia-original"), "utf8"), "#!/bin/sh\necho ORIGINAL-HOOK\n");
+    assert.match(await readFile(original, "utf8"), /GUANJIA PRE-COMMIT WRAPPER/);
+    const doctor = await cli(project, ["doctor", "--json"]);
+    assert.equal(doctor.checks.find((item) => item.id === "submit_gate").status, "pass");
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("宿主探针只有收到同 nonce 的真实回执才变为通过", async () => {
+  const project = await mkdtemp(join(tmpdir(), "guanjia-probe-"));
+  try {
+    await run("sh", [INSTALLER, project, "探针测试", "zcode"], project);
+    const nonce = "zcode-test-001";
+    await cli(project, ["probe", "--host", "zcode", "--nonce", nonce, "--json"]);
+    const before = await cli(project, ["doctor", "--json"]);
+    assert.equal(before.checks.find((item) => item.id === "host_hooks").status, "unverified");
+    await cli(project, ["host-event", "--input", JSON.stringify({ nonce, event: "session_start", session_id: "real-session-1", host: "zcode" }), "--json"]);
+    const after = await cli(project, ["doctor", "--json"]);
+    assert.equal(after.checks.find((item) => item.id === "host_hooks").status, "pass");
   } finally {
     await rm(project, { recursive: true, force: true });
   }

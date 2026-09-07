@@ -1,0 +1,14 @@
+{
+  "host": "zcode",
+  "version": "unverified",
+  "status": "unverified",
+  "events": ["session_start", "user_prompt", "tool_after", "stop"],
+  "transport": "host-specific-plugin",
+  "stdout": "protocol-only",
+  "stderr": "diagnostic-only",
+  "notes": [
+    "项目资料目录不等于用户级插件注册目录。",
+    "必须在真实 ZCode 新会话中用唯一 nonce 验证加载和回执。",
+    "Stop 补交接必须有次数上限，不能造成无限循环。"
+  ]
+}
