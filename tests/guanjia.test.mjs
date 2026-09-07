@@ -230,6 +230,33 @@ test("低风险纯文案任务可用轻量快照验证，代码改动不能借�
   }
 });
 
+test("任务契约修订会使旧证据失效并清空完成引用", async () => {
+  const project = await mkdtemp(join(tmpdir(), "guanjia-task-revise-"));
+  try {
+    await gitInit(project);
+    await writeFile(join(project, "README.md"), "fixture\n", "utf8");
+    await run("git", ["add", "README.md"], project);
+    await run("git", ["commit", "-qm", "fixture"], project);
+    await run("sh", [INSTALLER, project, "任务修订", "generic"], project);
+    await run("git", ["add", "guanjia", "AGENTS.md"], project);
+    await run("git", ["commit", "-qm", "install guanjia"], project);
+    await writeFile(join(project, "notes.md"), "第一版\n", "utf8");
+    await run("git", ["add", "notes.md"], project);
+    const started = await cli(project, ["task", "start", "--input", JSON.stringify({ goal: "整理说明", risk: "low", allowed_paths: ["notes.md"], acceptance: ["说明完整"] }), "--json"]);
+    const verified = await cli(project, ["verify", "--input", JSON.stringify({ task_id: started.task.id, expected_revision: started.revision, mode: "lightweight" }), "--json"]);
+    assert.equal(verified.evidence.status, "PASS");
+    const revised = await cli(project, ["task", "revise", "--input", JSON.stringify({ task_id: started.task.id, expected_revision: verified.revision, acceptance: ["说明完整且有例子"], next_action: "补充示例" }), "--json"]);
+    assert.equal(revised.task.acceptance_revision, 2);
+    assert.equal(revised.task.evidence_refs.length, 0);
+    assert.equal(revised.task.status, "implementing");
+    const verifying = await cli(project, ["task", "transition", "--input", JSON.stringify({ task_id: started.task.id, status: "verifying", expected_revision: revised.revision }), "--json"]);
+    const completed = await cli(project, ["task", "transition", "--input", JSON.stringify({ task_id: started.task.id, status: "completed", expected_revision: verifying.revision, evidence_refs: [verified.evidence.evidence_id] }), "--json"], 5);
+    assert.match(completed.error, /不是当前任务的有效 PASS/);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
 test("提交检查接入会保留原 hook，不把配置存在冒充生效", async () => {
   const project = await mkdtemp(join(tmpdir(), "guanjia-hooks-"));
   try {
