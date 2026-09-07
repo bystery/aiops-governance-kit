@@ -1,0 +1,42 @@
+{
+  "description": "Guanjia project recovery hooks",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": ["${ZCODE_PLUGIN_ROOT}/hooks/guanjia-hook.mjs"],
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": ["${ZCODE_PLUGIN_ROOT}/hooks/guanjia-hook.mjs"],
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": ["${ZCODE_PLUGIN_ROOT}/hooks/guanjia-hook.mjs"],
+            "timeoutMs": 3000
+          }
+        ]
+      }
+    ]
+  }
+}

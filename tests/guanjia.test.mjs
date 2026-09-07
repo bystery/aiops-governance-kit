@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, mkdir, rm, chmod } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, mkdir, rm, chmod, access, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 
 const exec = promisify(execFile);
@@ -24,10 +24,29 @@ async function run(command, args, cwd, expectExit = 0) {
   }
 }
 
+async function exists(path) {
+  try { await access(path); return true; } catch { return false; }
+}
+
 async function cli(project, args, expectExit = 0) {
   const result = await run("node", [CORE, ...args], project, expectExit);
   const output = result.stdout || "";
   return output.trim() ? JSON.parse(output) : null;
+}
+
+async function runHook(script, cwd, input) {
+  return new Promise((resolveResult, reject) => {
+    const child = spawn("node", [script], { cwd, encoding: "utf8" });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (code, signal) => resolveResult({ code, signal, stdout, stderr }));
+    child.stdin.end(`${JSON.stringify(input)}\n`);
+  });
 }
 
 async function gitInit(project) {
@@ -158,6 +177,40 @@ test("宿主探针只有收到同 nonce 的真实回执才变为通过", async (
   }
 });
 
+test("ZCode/Codex 薄适配器只注入当前项目短上下文，未接入项目不写入", async () => {
+  const project = await mkdtemp(join(tmpdir(), "guanjia-adapter-"));
+  try {
+    await run("sh", [INSTALLER, project, "适配器测试", "zcode"], project);
+    const zcodeHook = join(project, "guanjia", "adapters", "zcode-marketplace", "plugins", "guanjia", "hooks", "guanjia-hook.mjs");
+    const codexHook = join(project, "guanjia", "adapters", "codex", "hook.mjs");
+    const zcode = await runHook(zcodeHook, project, { cwd: project, hook_event_name: "SessionStart", session_id: "zcode-session-1" });
+    assert.equal(zcode.code, 0);
+    const zcodePayload = JSON.parse(zcode.stdout);
+    assert.equal(zcodePayload.hookSpecificOutput.hookEventName, "SessionStart");
+    assert.match(zcodePayload.hookSpecificOutput.additionalContext, /状态版本/);
+    const codex = await runHook(codexHook, project, { cwd: project, hook_event_name: "SessionStart", session_id: "codex-session-1" });
+    assert.equal(codex.code, 0);
+    assert.match(JSON.parse(codex.stdout).hookSpecificOutput.additionalContext, /管家恢复上下文/);
+    const foreign = await mkdtemp(join(tmpdir(), "guanjia-foreign-"));
+    try {
+      const before = await readFile(join(project, "guanjia", "state.json"), "utf8");
+      const result = await runHook(codexHook, foreign, { cwd: foreign, hook_event_name: "SessionStart", session_id: "foreign-session" });
+      assert.equal(result.code, 0);
+      assert.equal(result.stdout, "");
+      assert.equal(await readFile(join(project, "guanjia", "state.json"), "utf8"), before);
+    } finally {
+      await rm(foreign, { recursive: true, force: true });
+    }
+    const marketplace = JSON.parse(await readFile(join(project, "guanjia", "adapters", "zcode-marketplace", "marketplace.json"), "utf8"));
+    assert.equal(marketplace.plugins[0].name, "guanjia");
+    const codexHooks = JSON.parse(await readFile(join(project, "guanjia", "adapters", "codex", "project-hooks.json"), "utf8"));
+    assert.ok(codexHooks.hooks.SessionStart);
+    assert.ok(codexHooks.hooks.PostCompact);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
 test("旧 .aiops 迁移先 dry-run，apply 后保留源目录并可识别冲突", async () => {
   const project = await mkdtemp(join(tmpdir(), "guanjia-migrate-"));
   try {
@@ -170,12 +223,99 @@ test("旧 .aiops 迁移先 dry-run，apply 后保留源目录并可识别冲突"
     assert.equal(await readFile(join(project, ".aiops", "docs", "decisions", "ADR-001.md"), "utf8"), "# 历史决定\n");
     const applied = await cli(project, ["migrate", "--from", "aiops", "--apply", "--json"]);
     assert.equal(applied.status, "applied");
+    assert.equal(applied.mapped_policy, "standard");
     assert.equal(await readFile(join(project, "guanjia", "archive", "legacy-aiops", "docs", "decisions", "ADR-001.md"), "utf8"), "# 历史决定\n");
+    assert.equal(await readFile(join(project, ".aiops", "docs", "decisions", "ADR-001.md"), "utf8"), "# 历史决定\n");
     const second = await cli(project, ["migrate", "--from", "aiops", "--apply", "--json"], 4);
     assert.equal(second.status, "conflict");
     const uninstall = await cli(project, ["uninstall", "--dry-run", "--json"]);
     assert.equal(uninstall.status, "dry_run_only");
   } finally {
     await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("迁移遇到未知政策或目标写入故障时只返回冲突并回退本次变化", async () => {
+  const unknown = await mkdtemp(join(tmpdir(), "guanjia-migrate-policy-"));
+  try {
+    await run("sh", [INSTALLER, unknown, "未知政策", "generic"], unknown);
+    await mkdir(join(unknown, ".aiops", "docs"), { recursive: true });
+    await writeFile(join(unknown, ".aiops", "docs", "PROGRESS.md"), "当前授权模式：自定义无限放权\n", "utf8");
+    const before = await readFile(join(unknown, "guanjia", "state.json"), "utf8");
+    const result = await cli(unknown, ["migrate", "--from", "aiops", "--apply", "--json"], 4);
+    assert.equal(result.status, "conflict");
+    assert.equal(result.inventory.policy_conflict, true);
+    assert.equal(await readFile(join(unknown, "guanjia", "state.json"), "utf8"), before);
+    assert.equal(await exists(join(unknown, "guanjia", "archive")), false);
+  } finally {
+    await rm(unknown, { recursive: true, force: true });
+  }
+
+  const blocked = await mkdtemp(join(tmpdir(), "guanjia-migrate-rollback-"));
+  try {
+    await run("sh", [INSTALLER, blocked, "迁移回退", "generic"], blocked);
+    await mkdir(join(blocked, ".aiops", "docs"), { recursive: true });
+    await writeFile(join(blocked, ".aiops", "docs", "PROGRESS.md"), "当前授权模式：基础放权\n", "utf8");
+    await writeFile(join(blocked, ".aiops", "docs", "legacy.md"), "legacy\n", "utf8");
+    await writeFile(join(blocked, "guanjia", "archive"), "not-a-directory\n", "utf8");
+    const before = await readFile(join(blocked, "guanjia", "state.json"), "utf8");
+    const result = await cli(blocked, ["migrate", "--from", "aiops", "--apply", "--json"], 6);
+    assert.equal(result.ok, false);
+    assert.equal(await readFile(join(blocked, "guanjia", "state.json"), "utf8"), before);
+    assert.equal(await readFile(join(blocked, "guanjia", "archive"), "utf8"), "not-a-directory\n");
+    assert.deepEqual(await readdir(join(blocked, "guanjia", "runtime", "migration-staging")), []);
+  } finally {
+    await rm(blocked, { recursive: true, force: true });
+  }
+});
+
+test("没有任务契约的业务暂存改动不能假绿", async () => {
+  const project = await mkdtemp(join(tmpdir(), "guanjia-no-task-"));
+  try {
+    await gitInit(project);
+    await writeFile(join(project, "README.md"), "fixture\n", "utf8");
+    await run("git", ["add", "README.md"], project);
+    await run("git", ["commit", "-qm", "fixture"], project);
+    await run("sh", [INSTALLER, project, "无任务门禁", "generic"], project);
+    await run("git", ["add", "guanjia", "AGENTS.md"], project);
+    await run("git", ["commit", "-qm", "install guanjia"], project);
+    await mkdir(join(project, "src"));
+    await writeFile(join(project, "src", "change.txt"), "changed\n", "utf8");
+    await run("git", ["add", "src/change.txt"], project);
+    const result = await cli(project, ["check", "--scope", "staged", "--json"], 5);
+    assert.equal(result.result, "NOT_RUN");
+    assert.match(result.reason, /没有当前任务契约/);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("状态锁冲突和换分支恢复都进入可诊断路径", async () => {
+  const locked = await mkdtemp(join(tmpdir(), "guanjia-lock-"));
+  try {
+    await run("sh", [INSTALLER, locked, "锁测试", "generic"], locked);
+    await writeFile(join(locked, "guanjia", "runtime", "state.lock"), "{\"pid\":999\}\n", "utf8");
+    const checkpoint = await cli(locked, ["checkpoint", "--input", JSON.stringify({ summary: "不会写入" }), "--json"], 4);
+    assert.equal(checkpoint.ok, false);
+    assert.equal(checkpoint.code, 4);
+  } finally {
+    await rm(locked, { recursive: true, force: true });
+  }
+
+  const switched = await mkdtemp(join(tmpdir(), "guanjia-branch-"));
+  try {
+    await gitInit(switched);
+    await writeFile(join(switched, "README.md"), "fixture\n", "utf8");
+    await run("git", ["add", "README.md"], switched);
+    await run("git", ["commit", "-qm", "fixture"], switched);
+    await run("sh", [INSTALLER, switched, "换分支测试", "generic"], switched);
+    await run("git", ["add", "guanjia", "AGENTS.md"], switched);
+    await run("git", ["commit", "-qm", "install guanjia"], switched);
+    await run("git", ["switch", "-c", "changed"], switched);
+    const resumed = await cli(switched, ["resume", "--json"]);
+    assert.equal(resumed.action, "needs_review");
+    assert.match(resumed.reasons.join(" "), /分支已变化/);
+  } finally {
+    await rm(switched, { recursive: true, force: true });
   }
 });

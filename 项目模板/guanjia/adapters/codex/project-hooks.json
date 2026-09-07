@@ -1,0 +1,43 @@
+{
+  "description": "管家 Codex 项目恢复 hooks；复制/合并前请审查并通过 Codex 信任流程",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node guanjia/adapters/codex/hook.mjs",
+            "timeout": 5,
+            "additionalContextLimit": 5000
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node guanjia/adapters/codex/hook.mjs",
+            "timeout": 5,
+            "additionalContextLimit": 5000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node guanjia/adapters/codex/hook.mjs",
+            "timeout": 5,
+            "additionalContextLimit": 5000
+          }
+        ]
+      }
+    ]
+  }
+}

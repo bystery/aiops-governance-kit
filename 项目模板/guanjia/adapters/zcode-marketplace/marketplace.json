@@ -1,0 +1,15 @@
+{
+  "name": "guanjia-local",
+  "description": "管家项目恢复与状态检查插件",
+  "pluginRoot": "plugins",
+  "plugins": [
+    {
+      "name": "guanjia",
+      "source": "./guanjia",
+      "description": "在 ZCode 会话开始、用户输入和停止阶段读取管家状态",
+      "version": "0.1.0",
+      "category": "developer-tools",
+      "tags": ["guanjia", "project-state", "handoff"]
+    }
+  ]
+}

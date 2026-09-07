@@ -349,8 +349,14 @@ const STATIC_RESOURCE_PATHS = [
   "adapters/generic/hooks.json",
   "adapters/zcode/hooks.json",
   "adapters/codex/hooks.json",
+  "adapters/codex/project-hooks.json",
+  "adapters/codex/hook.mjs",
   "adapters/qoder/hooks.json",
   "adapters/workbuddy/hooks.json",
+  "adapters/zcode-marketplace/marketplace.json",
+  "adapters/zcode-marketplace/plugins/guanjia/.zcode-plugin/plugin.json",
+  "adapters/zcode-marketplace/plugins/guanjia/hooks/hooks.json",
+  "adapters/zcode-marketplace/plugins/guanjia/hooks/guanjia-hook.mjs",
   "hooks/README.md",
   "guanjia.ps1",
   "guanjia.cmd",
@@ -834,54 +840,98 @@ async function legacyInventory(project) {
   const progressPath = join(project.root, ".aiops/docs/PROGRESS.md");
   let authorityMode = null;
   let nextAction = null;
+  let pausedByUser = false;
   if (await exists(progressPath)) {
     const progress = await readText(progressPath);
     authorityMode = progress.match(/当前授权模式：([^\r\n]+)/)?.[1]?.trim() || null;
     nextAction = progress.match(/续跑入口：([^\r\n]+)/)?.[1]?.trim() || null;
+    pausedByUser = /用户明确暂停|paused_by_user\s*[:：]\s*true|当前暂停\s*[:：]\s*是/i.test(progress);
   }
+  const policyMap = { "默认": "standard", "基础放权": "standard", "激进放权": "elevated" };
+  const mappedPolicy = authorityMode ? policyMap[authorityMode] || null : "standard";
+  const policyConflict = Boolean(authorityMode && !mappedPolicy);
   const conflicts = [];
   for (const item of items) {
     const destination = join(project.guanjia, "archive", "legacy-aiops", item.path.replace(/^\.aiops[\\/]/, ""));
     if (await exists(destination)) conflicts.push({ source: item.path, destination: relative(project.root, destination), reason: "目标已存在" });
   }
-  return { source_present: items.length > 0, items, authority_mode: authorityMode, next_action: nextAction, conflicts };
+  return { source_present: items.length > 0, items, authority_mode: authorityMode, mapped_policy: mappedPolicy, policy_conflict: policyConflict, paused_by_user: pausedByUser, next_action: nextAction, conflicts };
 }
 
 async function migrateLegacy(project, apply) {
   const inventory = await legacyInventory(project);
   if (!inventory.source_present) return { ok: true, status: "not_needed", message: "未发现旧 .aiops/ 活跃资料。", inventory };
   const plan = {
-    status: inventory.conflicts.length ? "conflict" : apply ? "ready_to_apply" : "dry_run",
+    status: inventory.conflicts.length || inventory.policy_conflict ? "conflict" : apply ? "ready_to_apply" : "dry_run",
     source: ".aiops/",
     destination: "guanjia/archive/legacy-aiops/",
     preserve_source: true,
     inventory,
-    actions: ["复制旧资料为只读历史保留件", "生成迁移索引", "记录旧授权/续跑入口供人工核对", "不自动删除 .aiops/，不把旧审计升级成新 PASS"],
+    actions: ["先复制到事务暂存区并校验来源文件", "复制旧资料为只读历史保留件", "生成迁移索引并映射可识别政策", "不自动删除 .aiops/，不把旧审计升级成新 PASS", "任何切换失败只回退本次受管变化"],
   };
-  if (!apply || inventory.conflicts.length) return { ok: inventory.conflicts.length === 0, ...plan };
+  if (!apply || inventory.conflicts.length || inventory.policy_conflict) return { ok: inventory.conflicts.length === 0 && !inventory.policy_conflict, ...plan };
+  const migrationId = `MIGRATION-${Date.now()}-${randomUUID().slice(0, 8)}`;
+  const staging = join(project.guanjia, "runtime", "migration-staging", migrationId);
   const copied = [];
-  for (const item of inventory.items) {
-    const source = join(project.root, item.path);
-    const destination = join(project.guanjia, "archive", "legacy-aiops", item.path.replace(/^\.aiops[\\/]/, ""));
-    await fs.mkdir(dirname(destination), { recursive: true });
-    if (!(await exists(destination))) {
-      await fs.copyFile(source, destination);
+  const createdDestinations = [];
+  const migrationPath = join(project.guanjia, "records", "migrations", `${migrationId}.json`);
+  const originalConfig = structuredClone(project.config);
+  const originalState = structuredClone(project.state);
+  let stateMutated = false;
+  let configMutated = false;
+  try {
+    for (const item of inventory.items) {
+      const source = join(project.root, item.path);
+      const staged = join(staging, item.path.replace(/^\.aiops[\\/]/, ""));
+      await fs.mkdir(dirname(staged), { recursive: true });
+      await fs.copyFile(source, staged);
+    }
+    for (const item of inventory.items) {
+      const staged = join(staging, item.path.replace(/^\.aiops[\\/]/, ""));
+      const destination = join(project.guanjia, "archive", "legacy-aiops", item.path.replace(/^\.aiops[\\/]/, ""));
+      await fs.mkdir(dirname(destination), { recursive: true });
+      await fs.copyFile(staged, destination);
+      createdDestinations.push(destination);
       copied.push({ source: item.path, destination: relative(project.root, destination) });
     }
+    const migration = { schema_version: 1, migration_id: migrationId, created_at: now(), from: "aiops", source: ".aiops/", destination: "guanjia/archive/legacy-aiops/", copied, authority_mode: inventory.authority_mode, mapped_policy: inventory.mapped_policy, paused_by_user: inventory.paused_by_user, next_action: inventory.next_action, source_preserved: true, note: "旧资料只作为历史保留件；动态事实以 guanjia/state.json 为准。" };
+    await writeJsonAtomic(migrationPath, migration);
+    const release = await acquireLock(project.guanjia);
+    let next;
+    try {
+      const current = await readJson(project.statePath, "guanjia/state.json");
+      if (current.revision !== originalState.revision) throw new GuanjiaError(`迁移前状态已变化：需要 ${originalState.revision}，实际为 ${current.revision}。`, EXIT.CONFLICT);
+      next = structuredClone(current);
+      next.schema_version = SCHEMA_VERSION;
+      next.revision = current.revision + 1;
+      next.updated_at = now();
+      next.legacy_migration = { migration_id: migrationId, source: ".aiops/", copied_at: now(), source_preserved: true, legacy_authority_mode: inventory.authority_mode, mapped_policy: inventory.mapped_policy, legacy_next_action: inventory.next_action };
+      if (inventory.mapped_policy) next.authority.mode = inventory.mapped_policy;
+      if (inventory.paused_by_user) next.authority.paused_by_user = true;
+      next.authority.source_ref = `records/migrations/${migrationId}.json`;
+      await writeJsonAtomic(`${project.statePath}.bak`, current);
+      await writeJsonAtomic(project.statePath, next);
+      stateMutated = true;
+    } finally {
+      await release().catch(() => {});
+    }
+    const config = structuredClone(originalConfig);
+    config.updated_at = now();
+    config.legacy_migration = { migration_id: migrationId, source_preserved: true, mapped_policy: inventory.mapped_policy };
+    await writeJsonAtomic(project.configPath, config);
+    configMutated = true;
+    await fs.rm(staging, { recursive: true, force: true });
+    const updated = await loadProject(project.root);
+    await renderDerived(updated, next);
+    return { ok: true, status: "applied", migration_id: migrationId, copied, revision: next.revision, source_preserved: true, mapped_policy: inventory.mapped_policy, paused_by_user: inventory.paused_by_user };
+  } catch (error) {
+    for (const destination of createdDestinations.reverse()) await fs.rm(destination, { force: true }).catch(() => {});
+    await fs.rm(migrationPath, { force: true }).catch(() => {});
+    await fs.rm(staging, { recursive: true, force: true }).catch(() => {});
+    if (stateMutated) await writeJsonAtomic(project.statePath, originalState).catch(() => {});
+    if (configMutated) await writeJsonAtomic(project.configPath, originalConfig).catch(() => {});
+    throw error;
   }
-  const migrationId = `MIGRATION-${Date.now()}`;
-  const migration = { schema_version: 1, migration_id: migrationId, created_at: now(), from: "aiops", source: ".aiops/", destination: "guanjia/archive/legacy-aiops/", copied, authority_mode: inventory.authority_mode, next_action: inventory.next_action, source_preserved: true, note: "旧资料只作为历史保留件；动态事实以 guanjia/state.json 为准。" };
-  await writeJsonAtomic(join(project.guanjia, "records", "migrations", `${migrationId}.json`), migration);
-  const next = await mutateState(project, project.state.revision, (state) => {
-    state.legacy_migration = { migration_id: migrationId, source: ".aiops/", copied_at: now(), source_preserved: true, legacy_authority_mode: inventory.authority_mode, legacy_next_action: inventory.next_action };
-  });
-  const config = structuredClone(project.config);
-  config.updated_at = now();
-  config.legacy_migration = { migration_id: migrationId, source_preserved: true };
-  await writeJsonAtomic(project.configPath, config);
-  const updated = await loadProject(project.root);
-  await renderDerived(updated, next);
-  return { ok: true, status: "applied", migration_id: migrationId, copied, revision: next.revision, source_preserved: true };
 }
 
 async function uninstallPlan(project) {
@@ -934,8 +984,9 @@ async function main(argv) {
 }
 
 main(process.argv.slice(2)).catch((error) => {
-  const payload = { ok: false, error: error.message, code: error.code || EXIT.ENVIRONMENT, ...(error.details ? { details: error.details } : {}) };
+  const exitCode = Number.isInteger(error.code) ? error.code : EXIT.ENVIRONMENT;
+  const payload = { ok: false, error: error.message, code: exitCode, ...(error.details ? { details: error.details } : {}) };
   if (process.argv.includes("--json")) console.log(json(payload));
   else console.error(`[guanjia] ${error.message}`);
-  process.exitCode = error.code || EXIT.ENVIRONMENT;
+  process.exitCode = exitCode;
 });
