@@ -136,6 +136,27 @@ test("暂存业务改动没有证据不能放行，验证证据必须绑定暂�
   }
 });
 
+test("验证失败或命令不存在不能产生 PASS", async () => {
+  const project = await mkdtemp(join(tmpdir(), "guanjia-evidence-status-"));
+  try {
+    await gitInit(project);
+    await writeFile(join(project, "README.md"), "fixture\n", "utf8");
+    await run("git", ["add", "README.md"], project);
+    await run("git", ["commit", "-qm", "fixture"], project);
+    await run("sh", [INSTALLER, project, "证据状态", "generic"], project);
+    await run("git", ["add", "guanjia", "AGENTS.md"], project);
+    await run("git", ["commit", "-qm", "install guanjia"], project);
+    const started = await cli(project, ["task", "start", "--input", JSON.stringify({ goal: "验证命令状态", allowed_paths: ["src/**"], acceptance: ["命令结果可解释"] }), "--json"]);
+    const failed = await cli(project, ["verify", "--input", JSON.stringify({ task_id: started.task.id, expected_revision: started.revision, command: { executable: "node", args: ["-e", "process.exit(2)"], timeout_ms: 10000 } }), "--json"], 5);
+    assert.equal(failed.evidence.status, "FAIL");
+    const missing = await cli(project, ["verify", "--input", JSON.stringify({ task_id: started.task.id, expected_revision: failed.revision, command: { executable: "guanjia-command-that-does-not-exist", args: [], timeout_ms: 10000 } }), "--json"], 5);
+    assert.equal(missing.evidence.status, "NOT_RUN");
+    assert.equal(missing.evidence.exit_code, null);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
 test("提交检查接入会保留原 hook，不把配置存在冒充生效", async () => {
   const project = await mkdtemp(join(tmpdir(), "guanjia-hooks-"));
   try {
