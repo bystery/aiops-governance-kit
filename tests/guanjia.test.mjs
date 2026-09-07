@@ -10,6 +10,7 @@ import { promisify } from "node:util";
 const exec = promisify(execFile);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const INSTALLER = join(ROOT, "项目模板", "scripts", "init-project.sh");
+const POWERSHELL_INSTALLER = join(ROOT, "项目模板", "scripts", "init-project.ps1");
 const CORE = join(ROOT, "项目模板", "guanjia", "bin", "guanjia.mjs");
 
 async function run(command, args, cwd, expectExit = 0) {
@@ -41,6 +42,8 @@ test("安装保留原 AGENTS，特殊字符项目名不破坏资料，重复安�
     await writeFile(join(project, "AGENTS.md"), "用户原有规则\n不要覆盖我\n", "utf8");
     await mkdir(join(project, ".aiops"));
     await writeFile(join(project, ".aiops", "legacy.txt"), "legacy", "utf8");
+    assert.match(await readFile(POWERSHELL_INSTALLER, "utf8"), /--project \$Project/);
+    assert.match(await readFile(POWERSHELL_INSTALLER, "utf8"), /PSScriptRoot/);
     await run("sh", [INSTALLER, project, "A/B & R&D", "generic"], project);
     const agents = await readFile(join(project, "AGENTS.md"), "utf8");
     assert.match(agents, /用户原有规则/);
