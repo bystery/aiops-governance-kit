@@ -366,13 +366,14 @@ async function mergeAgents(root) {
   const next = hasBegin
     ? original.replace(new RegExp(`${MANAGED_BEGIN}[\\s\\S]*?${MANAGED_END}`, "m"), block)
     : `${original ? original.replace(/\s*$/, "") + "\n\n" : ""}${block}\n`;
+  let backupPath = null;
   if (original && original !== next) {
-    const backup = join(root, "guanjia", "runtime", "backups", `AGENTS.md.${Date.now()}.bak`);
-    await fs.mkdir(dirname(backup), { recursive: true });
-    await fs.copyFile(path, backup);
+    backupPath = join(root, "guanjia", "runtime", "backups", `AGENTS.md.${Date.now()}.bak`);
+    await fs.mkdir(dirname(backupPath), { recursive: true });
+    await fs.copyFile(path, backupPath);
   }
   if (original !== next) await writeAtomic(path, next);
-  return { path: "AGENTS.md", existed: Boolean(original), changed: original !== next };
+  return { path: "AGENTS.md", existed: Boolean(original), changed: original !== next, ...(backupPath ? { backup_path: backupPath } : {}) };
 }
 
 const STATIC_RESOURCE_PATHS = [
@@ -455,28 +456,66 @@ async function install(projectDir, name, host, dryRun) {
   };
   if (dryRun) return { ok: true, dry_run: true, plan };
 
-  await fs.mkdir(guanjia, { recursive: true });
-  await fs.mkdir(join(guanjia, "runtime", "backups"), { recursive: true });
-  if (!hasConfig) await writeJsonAtomic(configPath, config);
-  if (!(await exists(join(guanjia, "state.json")))) await writeJsonAtomic(join(guanjia, "state.json"), initialState(config, snapshot));
-  for (const [relativePath, content] of resources) {
-    const target = join(guanjia, relativePath);
-    if (await exists(target)) {
-      const current = await readText(target);
-      if (current !== content) throw new GuanjiaError(`受管文件已被修改，拒绝覆盖：${target}`, EXIT.CONFLICT);
-    } else {
-      await writeAtomic(target, content);
+  const originals = new Map();
+  const remember = async (path) => {
+    if (originals.has(path)) return;
+    originals.set(path, await exists(path) ? await readText(path) : null);
+  };
+  const restore = async () => {
+    const failures = [];
+    for (const [path, original] of [...originals.entries()].reverse()) {
+      try {
+        if (original === null) await fs.rm(path, { force: true });
+        else await writeAtomic(path, original);
+      } catch (error) {
+        failures.push(`${path}: ${error.message}`);
+      }
     }
+    return failures;
+  };
+  const generatedBackups = [];
+  try {
+    await fs.mkdir(guanjia, { recursive: true });
+    await fs.mkdir(join(guanjia, "runtime", "backups"), { recursive: true });
+    if (!hasConfig) {
+      await remember(configPath);
+      await writeJsonAtomic(configPath, config);
+    }
+    const statePath = join(guanjia, "state.json");
+    if (!(await exists(statePath))) {
+      await remember(statePath);
+      await writeJsonAtomic(statePath, initialState(config, snapshot));
+    }
+    for (const [relativePath, content] of resources) {
+      const target = join(guanjia, relativePath);
+      if (!(await exists(target))) {
+        await remember(target);
+        await writeAtomic(target, content);
+      }
+    }
+    await remember(join(guanjia, "README.md"));
+    await remember(join(guanjia, "HANDOFF.md"));
+    const project = await loadProject(root);
+    await renderDerived(project, project.state);
+    await remember(agentsPath);
+    const agentResult = await mergeAgents(root);
+    if (agentResult.backup_path) generatedBackups.push(agentResult.backup_path);
+    const managed = [];
+    for (const [relativePath] of resources) managed.push(`guanjia/${relativePath}`);
+    const manifestPath = join(guanjia, "manifest.json");
+    await remember(manifestPath);
+    const manifest = { schema_version: 1, package_version: config.package_version, generated_at: now(), files: {} };
+    for (const path of managed) manifest.files[path] = await sha256File(join(root, path));
+    await writeJsonAtomic(manifestPath, manifest);
+    return { ok: true, dry_run: false, plan, project_id: config.project_id, snapshot };
+  } catch (error) {
+    for (const backup of generatedBackups) await fs.rm(backup, { force: true }).catch(() => {});
+    const rollbackFailures = await restore();
+    if (rollbackFailures.length) {
+      throw new GuanjiaError(`安装失败且回退不完整：${error.message}`, EXIT.ENVIRONMENT, { rollback_failures: rollbackFailures });
+    }
+    throw error;
   }
-  const project = await loadProject(root);
-  await renderDerived(project, project.state);
-  await mergeAgents(root);
-  const managed = [];
-  for (const [relativePath] of resources) managed.push(`guanjia/${relativePath}`);
-  const manifest = { schema_version: 1, package_version: config.package_version, generated_at: now(), files: {} };
-  for (const path of managed) manifest.files[path] = await sha256File(join(root, path));
-  await writeJsonAtomic(join(guanjia, "manifest.json"), manifest);
-  return { ok: true, dry_run: false, plan, project_id: config.project_id, snapshot };
 }
 
 async function verifyManifest(project) {
