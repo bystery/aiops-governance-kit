@@ -5,7 +5,7 @@
 ## 本次已落地
 
 - M1 核心部分：Node 标准库安装器、写入前预检与失败回退、可见 `guanjia/` 资料夹、原子写入、受管 `AGENTS.md` 区块、资源 manifest、doctor 和旧 `.aiops/` 保留提示。
-- M2 核心部分：`state.json`、revision 乐观并发检查、本地锁、checkpoint、handoff、resume、状态面板和固定交接模板。
+- M2 核心部分：`state.json`、revision 乐观并发检查、本地锁、checkpoint、带版本/现场摘要的 handoff、过期交接检测、resume、状态面板和固定交接模板。
 - M4 基础部分：任务范围/完成标准/复用字段、风险级别与验证模式、契约修订失效旧证据、结构化验证证据、任务契约摘要、argv 执行、超时/命令缺失的 NOT_RUN、低风险文档轻量快照验证、快照绑定、暂存区检查。
 - M0 回归：已有规则不覆盖、特殊字符项目名、重复安装、用户暂停、坏状态/缺资源等核心 fixture。
 - M3/M4 增量：ZCode/Codex 适配契约、可审查的 ZCode marketplace/Codex hooks 模板、Node 薄桥接脚本、精简宿主事件与会话 ID 记录、带 nonce/host/event 契约校验的宿主探针、真实回执记录、组合式 pre-commit 安装和 doctor 生效判断。

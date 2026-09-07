@@ -707,7 +707,7 @@ function renderDashboard(config, state, snapshot) {
 function renderHandoff(config, state, snapshot) {
   const task = state.task;
   const complete = task?.summary_status === "complete";
-  return `# 项目交接单\n\n生成时间：${now()}\n项目：${config.project_name} + ${config.project_id}\n状态版本：${state.revision}；规则版本：${config.package_version}\n现场：${snapshot.branch || "无 Git 分支"} / ${snapshot.head || "无 HEAD"} / ${snapshot.snapshot_digest || "无快照"} / ${snapshot.dirty ? "有未提交改动" : "干净"}\n完整性：${complete ? "完整" : "仅机械现场，摘要待补"}\n\n## 我在帮用户做什么\n${task ? `${task.goal}\n需求原话引用：${task.request_ref || "未登记"}\n关键约束：${(task.acceptance || []).join("；") || "未登记"}` : "当前没有活跃任务。"}\n\n## 当前进度\n- 已完成并验证：${task?.evidence_refs?.length ? task.evidence_refs.join("、") : "暂无有效证据"}\n- 已改但未验证：${task?.status === "implementing" ? "当前任务可能包含未验证改动，请先核对现场" : "无记录"}\n- 未开始：${task?.next_action || "无"}\n\n## 当前授权与暂停\n模式：${state.authority.mode}；范围：${state.authority.scope.join("、") || "未限定"}\n暂停：${state.authority.paused_by_user ? "是，用户明确暂停" : "否"}\n\n## 已确定的设计\n${task?.reuse?.length ? task.reuse.map((item) => `- ${item.path}：${item.decision}；${item.reason}`).join("\\n") : "暂无设计记录。"}\n\n## 卡点与失败尝试\n${task?.unknowns?.length ? task.unknowns.map((item) => `- ${item}`).join("\\n") : "无已登记卡点。"}\n\n## 下一步\n${task?.next_action || "先读取 guanjia/state.json 并核对项目现场。"}\n\n## 文件与验证入口\n- 状态：guanjia/state.json\n- 入口：guanjia/START.md\n- 证据：guanjia/records/evidence/\n\n给接手会话：先核对项目与 state revision，再核对 Git/工作区现场。本单是生成快照，发生分歧以核验后的 state 与现场为准。用户暂停未解除时只汇报，不自动执行。\n`;
+  return `# 项目交接单\n\n<!-- GUANJIA_HANDOFF revision=${state.revision} snapshot=${snapshot.snapshot_digest || "none"} -->\n生成时间：${now()}\n项目：${config.project_name} + ${config.project_id}\n状态版本：${state.revision}；规则版本：${config.package_version}\n现场：${snapshot.branch || "无 Git 分支"} / ${snapshot.head || "无 HEAD"} / ${snapshot.snapshot_digest || "无快照"} / ${snapshot.dirty ? "有未提交改动" : "干净"}\n完整性：${complete ? "完整" : "仅机械现场，摘要待补"}\n\n## 我在帮用户做什么\n${task ? `${task.goal}\n需求原话引用：${task.request_ref || "未登记"}\n关键约束：${(task.acceptance || []).join("；") || "未登记"}` : "当前没有活跃任务。"}\n\n## 当前进度\n- 已完成并验证：${task?.evidence_refs?.length ? task.evidence_refs.join("、") : "暂无有效证据"}\n- 已改但未验证：${task?.status === "implementing" ? "当前任务可能包含未验证改动，请先核对现场" : "无记录"}\n- 未开始：${task?.next_action || "无"}\n\n## 当前授权与暂停\n模式：${state.authority.mode}；范围：${state.authority.scope.join("、") || "未限定"}\n暂停：${state.authority.paused_by_user ? "是，用户明确暂停" : "否"}\n\n## 已确定的设计\n${task?.reuse?.length ? task.reuse.map((item) => `- ${item.path}：${item.decision}；${item.reason}`).join("\\n") : "暂无设计记录。"}\n\n## 卡点与失败尝试\n${task?.unknowns?.length ? task.unknowns.map((item) => `- ${item}`).join("\\n") : "无已登记卡点。"}\n\n## 下一步\n${task?.next_action || "先读取 guanjia/state.json 并核对项目现场。"}\n\n## 文件与验证入口\n- 状态：guanjia/state.json\n- 入口：guanjia/START.md\n- 证据：guanjia/records/evidence/\n\n给接手会话：先核对项目与 state revision，再核对 Git/工作区现场。本单是生成快照，发生分歧以核验后的 state 与现场为准。用户暂停未解除时只汇报，不自动执行。\n`;
 }
 
 async function renderDerived(project, state) {
@@ -914,6 +914,19 @@ async function checkpoint(project, input = {}, releaseSession = false) {
   return { ok: true, revision: next.revision, summary_status: next.task?.summary_status || "complete", handoff: releaseSession };
 }
 
+async function handoffStatus(project) {
+  const path = join(project.guanjia, "HANDOFF.md");
+  if (!(await exists(path))) return { status: "missing", reason: "HANDOFF.md 缺失，需要重新生成交接单" };
+  const content = await readText(path);
+  const marker = content.match(/<!-- GUANJIA_HANDOFF revision=(\d+) snapshot=([^\s]+) -->/);
+  if (!marker) return { status: "legacy", reason: "HANDOFF.md 缺少机器状态标记，需要重新生成交接单" };
+  const revision = Number(marker[1]);
+  const snapshot = marker[2] === "none" ? null : marker[2];
+  if (revision !== project.state.revision) return { status: "stale", reason: `HANDOFF.md 已过期：记录 revision ${revision}，当前为 ${project.state.revision}`, revision, snapshot };
+  if (project.state.workspace.snapshot_digest && snapshot !== project.state.workspace.snapshot_digest) return { status: "stale", reason: "HANDOFF.md 的现场摘要与 state.json 不一致", revision, snapshot };
+  return { status: "pass", revision, snapshot };
+}
+
 async function resume(project) {
   const current = await workspaceSnapshot(project.root);
   const state = project.state;
@@ -921,8 +934,10 @@ async function resume(project) {
   if (state.authority.paused_by_user) reasons.push("用户仍处于暂停状态");
   if (state.workspace.branch && current.branch && state.workspace.branch !== current.branch) reasons.push(`分支已变化：${state.workspace.branch} -> ${current.branch}`);
   if (state.workspace.head && current.head && state.workspace.head !== current.head) reasons.push("HEAD 已变化，需要重新核对现场");
+  const handoff = await handoffStatus(project);
+  if (handoff.status !== "pass") reasons.push(handoff.reason);
   const action = state.authority.paused_by_user ? "report_only" : reasons.length ? "needs_review" : state.task ? "continue" : "ready";
-  return { ok: action !== "needs_review", action, project_id: state.project_id, revision: state.revision, task: state.task, authority: state.authority, current_workspace: current, reasons, next_action: state.task?.next_action || "等待用户提出任务" };
+  return { ok: action !== "needs_review", action, project_id: state.project_id, revision: state.revision, task: state.task, authority: state.authority, current_workspace: current, handoff, reasons, next_action: state.task?.next_action || "等待用户提出任务" };
 }
 
 async function runCommand(command, root) {

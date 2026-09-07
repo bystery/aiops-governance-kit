@@ -5,7 +5,7 @@
 ## 常用动作
 
 - 查看现状：node guanjia/bin/guanjia.mjs status --json
-- 恢复任务：node guanjia/bin/guanjia.mjs resume --json
+- 恢复任务：node guanjia/bin/guanjia.mjs resume --json（若 HANDOFF 过期或现场变化，会先进入 needs_review）
 - 暂停/交接：node guanjia/bin/guanjia.mjs handoff
 - 继续工作：先读取本文件、guanjia/state.json 和生成的 guanjia/HANDOFF.md。
 - 修改目标或验收标准：通过 `task revise` 修订任务契约；修订后旧验证证据会自动失效，必须重新验证。
