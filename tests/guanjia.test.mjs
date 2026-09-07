@@ -101,6 +101,23 @@ test("安装预检失败不会留下半套资料", async () => {
   }
 });
 
+test("安装事务遇到派生文件故障会回退已写入资源", async () => {
+  const project = await mkdtemp(join(tmpdir(), "guanjia-install-rollback-"));
+  try {
+    await mkdir(join(project, "guanjia"));
+    await writeFile(join(project, "guanjia", "config.json"), JSON.stringify({ schema_version: 1, project_id: "rollback-project", project_name: "回退", host: "generic", package_version: "0.1.0", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), validation: { commands: [] }, capabilities: { core: "verified", host_hooks: "unverified", submit_gate: "not_configured" } }), "utf8");
+    await mkdir(join(project, "guanjia", "README.md"));
+    const result = await run("sh", [INSTALLER, project, "回退失败", "generic"], project, 6);
+    assert.match(result.stderr, /EISDIR|目录/);
+    assert.equal(await exists(join(project, "guanjia", "state.json")), false);
+    assert.equal(await exists(join(project, "guanjia", "bin", "guanjia.mjs")), false);
+    assert.equal(await exists(join(project, "guanjia", "manifest.json")), false);
+    assert.equal(await exists(join(project, "guanjia", "README.md")), true);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
 test("交接、用户暂停和新会话恢复可观察且不会自动解除暂停", async () => {
   const project = await mkdtemp(join(tmpdir(), "guanjia-handoff-"));
   try {
