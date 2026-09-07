@@ -797,6 +797,93 @@ async function checkStaged(project) {
   return { ok: true, result: "PASS", reason: "任务范围、验证证据和暂存快照已绑定", evidence_refs: valid, snapshot_digest: digest };
 }
 
+const LEGACY_AIops_PATHS = [
+  ".aiops/AGENTS.md",
+  ".aiops/读集.md",
+  ".aiops/docs/PROGRESS.md",
+  ".aiops/docs/所有者面板.md",
+  ".aiops/docs/decisions",
+  ".aiops/docs/audits",
+  ".aiops/docs/archive",
+  ".aiops/agents",
+];
+
+async function listFilesRecursive(path, prefix = "") {
+  if (!(await exists(path))) return [];
+  const stat = await fs.stat(path);
+  if (stat.isFile()) return [{ path: prefix, size: stat.size }];
+  const result = [];
+  for (const name of await fs.readdir(path)) result.push(...await listFilesRecursive(join(path, name), prefix ? join(prefix, name) : name));
+  return result;
+}
+
+async function legacyInventory(project) {
+  const items = [];
+  for (const relativePath of LEGACY_AIops_PATHS) {
+    const full = join(project.root, relativePath);
+    const files = await listFilesRecursive(full, relativePath);
+    items.push(...files);
+  }
+  const progressPath = join(project.root, ".aiops/docs/PROGRESS.md");
+  let authorityMode = null;
+  let nextAction = null;
+  if (await exists(progressPath)) {
+    const progress = await readText(progressPath);
+    authorityMode = progress.match(/当前授权模式：([^\r\n]+)/)?.[1]?.trim() || null;
+    nextAction = progress.match(/续跑入口：([^\r\n]+)/)?.[1]?.trim() || null;
+  }
+  const conflicts = [];
+  for (const item of items) {
+    const destination = join(project.guanjia, "archive", "legacy-aiops", item.path.replace(/^\.aiops[\\/]/, ""));
+    if (await exists(destination)) conflicts.push({ source: item.path, destination: relative(project.root, destination), reason: "目标已存在" });
+  }
+  return { source_present: items.length > 0, items, authority_mode: authorityMode, next_action: nextAction, conflicts };
+}
+
+async function migrateLegacy(project, apply) {
+  const inventory = await legacyInventory(project);
+  if (!inventory.source_present) return { ok: true, status: "not_needed", message: "未发现旧 .aiops/ 活跃资料。", inventory };
+  const plan = {
+    status: inventory.conflicts.length ? "conflict" : apply ? "ready_to_apply" : "dry_run",
+    source: ".aiops/",
+    destination: "guanjia/archive/legacy-aiops/",
+    preserve_source: true,
+    inventory,
+    actions: ["复制旧资料为只读历史保留件", "生成迁移索引", "记录旧授权/续跑入口供人工核对", "不自动删除 .aiops/，不把旧审计升级成新 PASS"],
+  };
+  if (!apply || inventory.conflicts.length) return { ok: inventory.conflicts.length === 0, ...plan };
+  const copied = [];
+  for (const item of inventory.items) {
+    const source = join(project.root, item.path);
+    const destination = join(project.guanjia, "archive", "legacy-aiops", item.path.replace(/^\.aiops[\\/]/, ""));
+    await fs.mkdir(dirname(destination), { recursive: true });
+    if (!(await exists(destination))) {
+      await fs.copyFile(source, destination);
+      copied.push({ source: item.path, destination: relative(project.root, destination) });
+    }
+  }
+  const migrationId = `MIGRATION-${Date.now()}`;
+  const migration = { schema_version: 1, migration_id: migrationId, created_at: now(), from: "aiops", source: ".aiops/", destination: "guanjia/archive/legacy-aiops/", copied, authority_mode: inventory.authority_mode, next_action: inventory.next_action, source_preserved: true, note: "旧资料只作为历史保留件；动态事实以 guanjia/state.json 为准。" };
+  await writeJsonAtomic(join(project.guanjia, "records", "migrations", `${migrationId}.json`), migration);
+  const next = await mutateState(project, project.state.revision, (state) => {
+    state.legacy_migration = { migration_id: migrationId, source: ".aiops/", copied_at: now(), source_preserved: true, legacy_authority_mode: inventory.authority_mode, legacy_next_action: inventory.next_action };
+  });
+  const config = structuredClone(project.config);
+  config.updated_at = now();
+  config.legacy_migration = { migration_id: migrationId, source_preserved: true };
+  await writeJsonAtomic(project.configPath, config);
+  const updated = await loadProject(project.root);
+  await renderDerived(updated, next);
+  return { ok: true, status: "applied", migration_id: migrationId, copied, revision: next.revision, source_preserved: true };
+}
+
+async function uninstallPlan(project) {
+  const manifestPath = join(project.guanjia, "manifest.json");
+  const managedFiles = await exists(manifestPath) ? Object.keys((await readJson(manifestPath, "guanjia/manifest.json")).files || {}) : [];
+  const agents = await exists(join(project.root, "AGENTS.md")) ? await readText(join(project.root, "AGENTS.md")) : "";
+  return { ok: true, status: "dry_run_only", managed_files: managedFiles, has_managed_agents_block: agents.includes(MANAGED_BEGIN) && agents.includes(MANAGED_END), hook: await hookDetails(project.root), warning: "初版卸载只生成清单，不删除状态、证据、交接历史或用户修改。" };
+}
+
 async function main(argv) {
   const command = argv[0];
   const { positional, options } = parseArgs(argv.slice(1));
@@ -830,6 +917,8 @@ async function main(argv) {
   if (command === "hooks" && positional[0] === "install") { const result = await installHooks(project); console.log(json(result)); return result; }
   if (command === "probe") { const result = await probeHost(project, options.host || project.config.host || "generic", options.nonce); console.log(json(result)); return result; }
   if (command === "host-event") { const result = await hostEvent(project, parseInput(options)); console.log(json(result)); return result; }
+  if (command === "migrate" && options.from === "aiops") { const result = await migrateLegacy(project, Boolean(options.apply)); console.log(json(result)); if (!result.ok) process.exitCode = result.status === "conflict" ? EXIT.CONFLICT : EXIT.CAPABILITY; return result; }
+  if (command === "uninstall") { const result = await uninstallPlan(project); console.log(json(result)); return result; }
   if (command === "task" && positional[0] === "start") { const input = parseInput(options); const result = await startTask(project, input, input.expected_revision); console.log(json(result)); return result; }
   if (command === "task" && positional[0] === "transition") { const input = parseInput(options); const result = await transitionTask(project, input); console.log(json(result)); return result; }
   if (command === "verify") { const result = await verify(project, parseInput(options)); console.log(json(result)); if (!result.ok) process.exitCode = EXIT.CHECK; return result; }

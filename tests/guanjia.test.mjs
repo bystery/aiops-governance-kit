@@ -146,3 +146,25 @@ test("宿主探针只有收到同 nonce 的真实回执才变为通过", async (
     await rm(project, { recursive: true, force: true });
   }
 });
+
+test("旧 .aiops 迁移先 dry-run，apply 后保留源目录并可识别冲突", async () => {
+  const project = await mkdtemp(join(tmpdir(), "guanjia-migrate-"));
+  try {
+    await run("sh", [INSTALLER, project, "迁移测试", "generic"], project);
+    await mkdir(join(project, ".aiops", "docs", "decisions"), { recursive: true });
+    await writeFile(join(project, ".aiops", "docs", "PROGRESS.md"), "# 进度\n> 当前授权模式：基础放权\n续跑入口：先读旧现场\n", "utf8");
+    await writeFile(join(project, ".aiops", "docs", "decisions", "ADR-001.md"), "# 历史决定\n", "utf8");
+    const dryRun = await cli(project, ["migrate", "--from", "aiops", "--json"]);
+    assert.equal(dryRun.status, "dry_run");
+    assert.equal(await readFile(join(project, ".aiops", "docs", "decisions", "ADR-001.md"), "utf8"), "# 历史决定\n");
+    const applied = await cli(project, ["migrate", "--from", "aiops", "--apply", "--json"]);
+    assert.equal(applied.status, "applied");
+    assert.equal(await readFile(join(project, "guanjia", "archive", "legacy-aiops", "docs", "decisions", "ADR-001.md"), "utf8"), "# 历史决定\n");
+    const second = await cli(project, ["migrate", "--from", "aiops", "--apply", "--json"], 4);
+    assert.equal(second.status, "conflict");
+    const uninstall = await cli(project, ["uninstall", "--dry-run", "--json"]);
+    assert.equal(uninstall.status, "dry_run_only");
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
