@@ -37,12 +37,14 @@ node guanjia/bin/guanjia.mjs handoff
 - 基础提交检查：`check --scope staged --json` 会检查业务改动是否有任务、是否越界、是否有绑定当前暂存快照的 PASS 证据。
 - 提交检查接入：`hooks install` 会组合已有 `pre-commit`，保留原检查，不自动接管已有 `core.hooksPath`；doctor 只在真实包装器存在时显示已启用。
 - 宿主探针：`probe` / `host-event` 用唯一 nonce 记录真实事件回执；配置文件和模拟 JSON 不会被当成宿主已接入。
+- 旧项目迁移：`migrate --from aiops` 默认只生成清单；显式 `--apply` 才复制历史资料，源 `.aiops/` 保留，重复迁移会报告冲突。
+- 卸载诊断：`uninstall --dry-run` 只列出受管文件、入口区块和 hook，不删除状态、证据或用户修改。
 
 ## 尚未宣称完成的部分
 
 ZCode/Codex 的真实生命周期 hook、插件信任/启用、跨宿主自动注入、Windows 原生和 macOS Finder 解压实测仍是独立验证项。仓库现在提供适配契约和 nonce 探针，但必须在真实客户端中触发并收到回执后才会变成 `pass`；`doctor` 不会把生成文件冒充自动接入。
 
-旧 `.aiops/` 资料会被保留。本轮没有自动迁移、删除或改写旧历史；迁移器应在后续阶段提供 dry-run、冲突清单和可回退切换。
+旧 `.aiops/` 资料会被保留。迁移默认 dry-run；应用时只复制到 `guanjia/archive/legacy-aiops/` 并写入迁移索引，不删除原目录，也不把旧审计升级成新的通过证据。
 
 ## 目录约定
 
