@@ -1,0 +1,8 @@
+{
+  "host": "generic",
+  "version": "manual",
+  "status": "supported",
+  "events": ["manual_context", "manual_checkpoint", "manual_stop"],
+  "transport": "command-line",
+  "notes": ["通用模式不宣称自动注入；用户或宿主显式调用管家命令即可。"]
+}

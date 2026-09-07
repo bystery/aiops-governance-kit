@@ -15,6 +15,20 @@ node guanjia/bin/guanjia.mjs doctor --json
 node guanjia/bin/guanjia.mjs status --json
 ```
 
+安装后也可以使用项目内的跨平台入口；它们会自动把项目根目录传给核心程序，因此不要求当前目录必须是项目根目录：
+
+```powershell
+& .\guanjia\guanjia.ps1 doctor --json
+```
+
+```bat
+guanjia\guanjia.cmd status --json
+```
+
+```sh
+sh guanjia/guanjia.sh status --json
+```
+
 安装会生成一个可见的 `guanjia/` 资料夹，并把一个带 `GUANJIA BEGIN/END` 标记的短区块合并到根目录 `AGENTS.md`。已有 `AGENTS.md`、业务文件和旧 `.aiops/` 不会被覆盖或删除；发现冲突时会停止并说明原因。
 
 然后可以这样记录第一个任务：
@@ -39,10 +53,12 @@ node guanjia/bin/guanjia.mjs handoff
 - 宿主探针：`probe` / `host-event` 用唯一 nonce 记录真实事件回执；配置文件和模拟 JSON 不会被当成宿主已接入。
 - 旧项目迁移：`migrate --from aiops` 默认只生成清单；显式 `--apply` 才复制历史资料，源 `.aiops/` 保留，重复迁移会报告冲突。
 - 卸载诊断：`uninstall --dry-run` 只列出受管文件、入口区块和 hook，不删除状态、证据或用户修改。
+- 跨平台入口：提供 PowerShell、CMD 和 POSIX shell 薄包装器；核心逻辑仍只有一份，并显式固定 `--project`。
+- 宿主适配契约：补齐 generic、Qoder、WorkBuddy 的事件契约；未收到真实 nonce 回执的宿主仍保持 `unverified`。
 
 ## 尚未宣称完成的部分
 
-ZCode/Codex 的真实生命周期 hook、插件信任/启用、跨宿主自动注入、Windows 原生和 macOS Finder 解压实测仍是独立验证项。仓库现在提供适配契约和 nonce 探针，但必须在真实客户端中触发并收到回执后才会变成 `pass`；`doctor` 不会把生成文件冒充自动接入。
+ZCode/Codex/Qoder/WorkBuddy 的真实生命周期 hook、插件信任/启用、跨宿主自动注入、Windows 原生和 macOS Finder 解压实测仍是独立验证项。仓库现在提供适配契约、跨平台入口和 nonce 探针，但必须在真实客户端中触发并收到回执后才会变成 `pass`；`doctor` 不会把生成文件冒充自动接入。
 
 旧 `.aiops/` 资料会被保留。迁移默认 dry-run；应用时只复制到 `guanjia/archive/legacy-aiops/` 并写入迁移索引，不删除原目录，也不把旧审计升级成新的通过证据。
 
