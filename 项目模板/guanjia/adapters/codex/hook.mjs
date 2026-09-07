@@ -37,7 +37,7 @@ function compactContext(payload) {
   const task = payload.task;
   return [
     `管家恢复上下文：项目 ${payload.project_id}，状态版本 ${payload.revision}。`,
-    `任务：${task ? `${task.id} / ${task.status} / ${task.goal}` : "当前没有活跃任务"}。`,
+    `任务：${task ? `${task.id} / ${task.status} / ${task.goal} / 风险 ${task.risk || "standard"}` : "当前没有活跃任务"}。`,
     `授权：${payload.authority?.paused_by_user ? "用户已暂停，只汇报不执行写任务" : `范围 ${payload.authority?.scope?.join("、") || "未限定"}`}。`,
     `下一步：${task?.next_action || "等待用户提出任务"}。`,
     payload.instructions || "先核对现场，再按当前任务范围工作。",

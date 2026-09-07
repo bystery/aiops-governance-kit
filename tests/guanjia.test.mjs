@@ -157,6 +157,47 @@ test("验证失败或命令不存在不能产生 PASS", async () => {
   }
 });
 
+test("低风险纯文案任务可用轻量快照验证，代码改动不能借此放行", async () => {
+  const project = await mkdtemp(join(tmpdir(), "guanjia-lightweight-"));
+  try {
+    await gitInit(project);
+    await writeFile(join(project, "README.md"), "fixture\n", "utf8");
+    await run("git", ["add", "README.md"], project);
+    await run("git", ["commit", "-qm", "fixture"], project);
+    await run("sh", [INSTALLER, project, "轻量验证", "generic"], project);
+    await run("git", ["add", "guanjia", "AGENTS.md"], project);
+    await run("git", ["commit", "-qm", "install guanjia"], project);
+    await writeFile(join(project, "docs.md"), "说明更新\n", "utf8");
+    await run("git", ["add", "docs.md"], project);
+    const started = await cli(project, ["task", "start", "--input", JSON.stringify({ goal: "更新说明", risk: "low", allowed_paths: ["docs.md"], acceptance: ["说明清楚"] }), "--json"]);
+    const verified = await cli(project, ["verify", "--input", JSON.stringify({ task_id: started.task.id, expected_revision: started.revision, mode: "lightweight" }), "--json"]);
+    assert.equal(verified.evidence.status, "PASS");
+    assert.equal(verified.evidence.verification.kind, "lightweight");
+    const completed = await cli(project, ["task", "transition", "--input", JSON.stringify({ task_id: started.task.id, status: "completed", expected_revision: verified.revision, evidence_refs: [verified.evidence.evidence_id] }), "--json"]);
+    assert.equal(completed.task.status, "completed");
+
+    const codeProject = await mkdtemp(join(tmpdir(), "guanjia-lightweight-code-"));
+    try {
+      await gitInit(codeProject);
+      await writeFile(join(codeProject, "README.md"), "fixture\n", "utf8");
+      await run("git", ["add", "README.md"], codeProject);
+      await run("git", ["commit", "-qm", "fixture"], codeProject);
+      await run("sh", [INSTALLER, codeProject, "轻量代码拒绝", "generic"], codeProject);
+      await run("git", ["add", "guanjia", "AGENTS.md"], codeProject);
+      await run("git", ["commit", "-qm", "install guanjia"], codeProject);
+      await writeFile(join(codeProject, "src.js"), "console.log('no');\n", "utf8");
+      await run("git", ["add", "src.js"], codeProject);
+      const codeTask = await cli(codeProject, ["task", "start", "--input", JSON.stringify({ goal: "修改代码", risk: "low", allowed_paths: ["src.js"], acceptance: ["代码可运行"] }), "--json"]);
+      const rejected = await cli(codeProject, ["verify", "--input", JSON.stringify({ task_id: codeTask.task.id, expected_revision: codeTask.revision, mode: "lightweight" }), "--json"], 5);
+      assert.equal(rejected.evidence.status, "FAIL");
+    } finally {
+      await rm(codeProject, { recursive: true, force: true });
+    }
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
 test("提交检查接入会保留原 hook，不把配置存在冒充生效", async () => {
   const project = await mkdtemp(join(tmpdir(), "guanjia-hooks-"));
   try {

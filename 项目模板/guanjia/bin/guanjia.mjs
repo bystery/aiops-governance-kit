@@ -646,6 +646,8 @@ function taskContractDigest(task) {
     allowed_paths: task.allowed_paths || [],
     acceptance_revision: task.acceptance_revision,
     acceptance: task.acceptance || [],
+    risk: task.risk,
+    verification_mode: task.verification_mode,
   }));
 }
 
@@ -654,6 +656,9 @@ function validateTaskInput(input) {
   if (!String(input.goal || "").trim()) throw new GuanjiaError("任务缺少 goal。", EXIT.INPUT);
   if (!Array.isArray(input.allowed_paths) || input.allowed_paths.length === 0) throw new GuanjiaError("任务必须提供非空 allowed_paths。", EXIT.INPUT);
   if (!Array.isArray(input.acceptance) || input.acceptance.length === 0) throw new GuanjiaError("任务必须提供非空 acceptance。", EXIT.INPUT);
+  if (input.risk !== undefined && !["low", "standard", "high"].includes(input.risk)) throw new GuanjiaError("任务 risk 必须是 low、standard 或 high。", EXIT.INPUT);
+  if (input.verification_mode !== undefined && !["command", "lightweight"].includes(input.verification_mode)) throw new GuanjiaError("任务 verification_mode 必须是 command 或 lightweight。", EXIT.INPUT);
+  if (input.verification_mode === "lightweight" && input.risk !== "low") throw new GuanjiaError("lightweight 验证只允许 low 风险任务。", EXIT.INPUT);
 }
 
 async function startTask(project, input, expectedRevision) {
@@ -666,6 +671,8 @@ async function startTask(project, input, expectedRevision) {
     goal: String(input.goal),
     request_ref: input.request_ref || null,
     allowed_paths: input.allowed_paths,
+    risk: input.risk || "standard",
+    verification_mode: input.verification_mode || (input.risk === "low" ? "lightweight" : "command"),
     acceptance_revision: Number(input.acceptance_revision || 1),
     acceptance: input.acceptance,
     reuse: Array.isArray(input.reuse) ? input.reuse : [],
@@ -800,11 +807,44 @@ async function runCommand(command, root) {
   });
 }
 
+const LIGHTWEIGHT_DOCUMENT_SUFFIXES = new Set([".md", ".markdown", ".mdx", ".txt", ".rst", ".adoc", ".asciidoc"]);
+
+function isLightweightDocument(path) {
+  const dot = path.lastIndexOf(".");
+  return dot >= 0 && LIGHTWEIGHT_DOCUMENT_SUFFIXES.has(path.slice(dot).toLowerCase());
+}
+
+async function lightweightVerification(project, task) {
+  const paths = await stagedPaths(project.root);
+  const business = paths.filter((path) => !path.startsWith("guanjia/") && path !== "AGENTS.md");
+  const outside = business.filter((path) => !allowedPath(path, task.allowed_paths || []));
+  const nonDocument = business.filter((path) => !isLightweightDocument(path));
+  const ok = task.risk === "low" && task.verification_mode === "lightweight" && business.length > 0 && outside.length === 0 && nonDocument.length === 0;
+  const reason = task.risk !== "low"
+    ? "只有 low 风险任务允许轻量验证"
+    : task.verification_mode !== "lightweight"
+      ? "当前任务契约未启用轻量验证"
+      : !business.length
+        ? "暂存区没有业务文档改动"
+        : outside.length
+          ? `改动超出任务范围：${outside.join(", ")}`
+          : nonDocument.length
+            ? `包含非文档文件：${nonDocument.join(", ")}`
+            : "低风险文档改动已绑定当前任务范围";
+  return { ok, paths: business, outside, non_document: nonDocument, reason };
+}
+
 async function verify(project, input) {
   const task = project.state.task;
   if (!task || task.id !== input.task_id) throw new GuanjiaError("验证任务不存在或 task_id 不匹配。", EXIT.CONFLICT);
   const before = await stagedDigest(project.root);
-  const result = await runCommand(input.command, project.root);
+  const mode = input.mode || task.verification_mode || "command";
+  if (mode !== "command" && mode !== "lightweight") throw new GuanjiaError("验证 mode 必须是 command 或 lightweight。", EXIT.INPUT);
+  if (mode === "lightweight" && task.verification_mode !== "lightweight") throw new GuanjiaError("当前任务契约不允许轻量验证。", EXIT.CHECK);
+  const lightweight = mode === "lightweight" ? await lightweightVerification(project, task) : null;
+  const result = lightweight
+    ? { exit_code: lightweight.ok ? 0 : 1, timed_out: false, stdout: "", stderr: lightweight.ok ? "" : lightweight.reason }
+    : await runCommand(input.command, project.root);
   const after = await stagedDigest(project.root);
   const evidenceId = input.evidence_id || `E-${String(project.state.revision + 1).padStart(3, "0")}`;
   const evidence = {
@@ -813,7 +853,8 @@ async function verify(project, input) {
     task_id: task.id,
     acceptance_revision: task.acceptance_revision,
     status: result.exit_code === null || result.timed_out ? "NOT_RUN" : result.exit_code === 0 && before === after ? "PASS" : "FAIL",
-    command: { executable: input.command.executable, args: input.command.args, cwd: input.command.cwd || ".", timeout_ms: Number(input.command.timeout_ms || 300000) },
+    command: mode === "lightweight" ? null : { executable: input.command.executable, args: input.command.args, cwd: input.command.cwd || ".", timeout_ms: Number(input.command.timeout_ms || 300000) },
+    verification: mode === "lightweight" ? { kind: "lightweight", paths: lightweight.paths, reason: lightweight.reason } : { kind: "command" },
     exit_code: result.exit_code,
     timed_out: result.timed_out,
     stdout: result.stdout.slice(-20000),
@@ -1012,7 +1053,7 @@ async function main(argv) {
   if (command === "context") {
     const recordedEvent = options["record-event"] ? await recordContextEvent(project, { event: options.event || "manual", session_id: options.session || null, host: options.host || project.config.host, source: options.source || "context" }) : null;
     const current = recordedEvent ? await loadProject(project.root) : project;
-    const result = { ok: true, event: options.event || "manual", session_id: options.session || null, ...(recordedEvent ? { recorded_event: recordedEvent } : {}), project_id: current.config.project_id, revision: current.state.revision, task: current.state.task ? { id: current.state.task.id, status: current.state.task.status, goal: current.state.task.goal, allowed_paths: current.state.task.allowed_paths, acceptance: current.state.task.acceptance, next_action: current.state.task.next_action, evidence_refs: current.state.task.evidence_refs } : null, authority: current.state.authority, workspace: await workspaceSnapshot(current.root), instructions: current.state.authority.paused_by_user ? "用户已暂停：只汇报，不执行写任务。" : "先核对现场，再按当前任务范围工作。" };
+    const result = { ok: true, event: options.event || "manual", session_id: options.session || null, ...(recordedEvent ? { recorded_event: recordedEvent } : {}), project_id: current.config.project_id, revision: current.state.revision, task: current.state.task ? { id: current.state.task.id, status: current.state.task.status, goal: current.state.task.goal, allowed_paths: current.state.task.allowed_paths, risk: current.state.task.risk || "standard", verification_mode: current.state.task.verification_mode || "command", acceptance: current.state.task.acceptance, next_action: current.state.task.next_action, evidence_refs: current.state.task.evidence_refs } : null, authority: current.state.authority, workspace: await workspaceSnapshot(current.root), instructions: current.state.authority.paused_by_user ? "用户已暂停：只汇报，不执行写任务。" : "先核对现场，再按当前任务范围工作。" };
     console.log(json(result));
     return result;
   }
